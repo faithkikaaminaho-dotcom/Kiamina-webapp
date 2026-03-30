@@ -1269,7 +1269,7 @@ function PreliminaryCorporateSite({
           <Reveal className="space-y-6 text-center lg:text-left">
             <span className="mx-auto inline-flex rounded-full border border-white/35 bg-white/10 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-white lg:mx-0">Trusted Global Accounting Advisory Partner</span>
             <h1 className="text-balance text-4xl font-semibold leading-tight text-white sm:text-5xl">
-              Businesses and Not-for-Profit Organizations Across Nigeria and Globally
+              Financial Reporting, Financial Advisory, & Tax Compliance Services in Port Harcourt, Nigeria
 
             </h1>
             <p className="mx-auto max-w-3xl text-lg text-blue-50 lg:mx-0">
