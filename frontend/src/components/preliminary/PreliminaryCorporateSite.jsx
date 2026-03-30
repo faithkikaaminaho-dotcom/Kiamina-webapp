@@ -1267,9 +1267,10 @@ function PreliminaryCorporateSite({
       <HeroPanel pageKey="home" scrollY={scrollY}>
         <div className="grid gap-8 lg:grid-cols-[1.25fr_0.95fr]">
           <Reveal className="space-y-6 text-center lg:text-left">
-            <span className="mx-auto inline-flex rounded-full border border-white/35 bg-white/10 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-white lg:mx-0">Global Advisory Standard</span>
+            <span className="mx-auto inline-flex rounded-full border border-white/35 bg-white/10 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-white lg:mx-0">Trusted Global Accounting Advisory Partner</span>
             <h1 className="text-balance text-4xl font-semibold leading-tight text-white sm:text-5xl">
-              Trusted Accounting, Bookkeeping &amp; Tax Compliance Services
+              Businesses and Not-for-Profit Organizations Across Nigeria and Globally
+
             </h1>
             <p className="mx-auto max-w-3xl text-lg text-blue-50 lg:mx-0">
               Serving Businesses and Not-for-Profit Organizations Across Nigeria, Canada, United States, United Kingdom, and Australia.
