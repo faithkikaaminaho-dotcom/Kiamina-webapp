@@ -1273,7 +1273,7 @@ function PreliminaryCorporateSite({
 
             </h1>
             <p className="mx-auto max-w-3xl text-lg text-blue-50 lg:mx-0">
-              Serving Businesses and Not-for-Profit Organizations Across Nigeria, Canada, United States, United Kingdom, and Australia.
+              Supporting Businesses and Not-for-Profit Organizations Across Nigeria and International Markets
             </p>
             <p className="mx-auto max-w-3xl text-blue-100/95 lg:mx-0">
               Kiamina Accounting Services delivers structured accounting, bookkeeping, tax compliance, payroll, and financial advisory support using cloud-enabled systems with IFRS, GAAP, and US GAAP alignment for cross-border operations.
