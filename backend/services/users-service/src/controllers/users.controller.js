@@ -1,9 +1,14 @@
 import {
+  acceptClientTeamInviteByUid,
+  cancelClientTeamInviteByUid,
+  createClientTeamInviteByUid,
   deleteUser,
   deleteUserForUid,
   ensureUserFromActor,
+  getClientTeamByUid,
   getClientPhoneAvailability,
   getClientManagementClientByUidForAdmin,
+  getPublicClientTeamInvite,
   listClientManagementClientsForAdmin,
   listAdminStaffForAdmin,
   getAdminDashboardByUid,
@@ -16,28 +21,37 @@ import {
   upsertPublicSupportLead,
   updateAdminStaffByUid,
   updateAdminDashboardByUid,
+  updateClientTeamMemberByUid,
   updateClientManagementClientByUidForAdmin,
   updateClientDashboardByUid,
   updateClientProfileByUid,
   updateClientWorkspaceByUid,
+  removeClientTeamMemberByUid,
   syncUserFromAuth,
   updateUser
 } from "../services/users.service.js";
 import {
   getRequestActor,
-  isAdminActor,
-  isElevatedAdminActor
+  isAdminActor
 } from "../utils/request-actor.js";
+import {
+  buildAdminAccessContext,
+  hasAnyAdminPermission
+} from "../utils/admin-access.js";
 import {
   buildAdminClientManagementUpdatePayload,
   buildAdminDashboardUpdatePayload,
   buildAdminStaffUpdatePayload,
   buildClientDashboardUpdatePayload,
+  buildClientTeamInviteAcceptPayload,
+  buildClientTeamInviteCreatePayload,
+  buildClientTeamMemberUpdatePayload,
   buildClientProfileUpdatePayload,
   buildClientWorkspaceUpdatePayload,
   buildPublicNewsletterPayload,
   buildPublicSupportLeadPayload,
   buildUserUpdatePayload,
+  validatePublicClientTeamInviteQuery,
   validateAdminClientManagementListQuery,
   validateSyncFromAuthPayload
 } from "../validation/users.validation.js";
@@ -67,6 +81,169 @@ const resolveAccountDeletionReason = (source, fallback = "account-deleted") => {
     return fallback;
   }
   return normalized.slice(0, 120);
+};
+
+const ADMIN_CLIENT_MANAGEMENT_LIST_PERMISSION_IDS = [
+  "view_businesses",
+  "view_assigned_clients"
+];
+
+const ADMIN_CLIENT_MANAGEMENT_DETAIL_PERMISSION_IDS = [
+  ...ADMIN_CLIENT_MANAGEMENT_LIST_PERMISSION_IDS,
+  "view_client_settings",
+  "edit_client_settings",
+  "view_documents",
+  "view_upload_history",
+  "view_activity_logs"
+];
+
+const ADMIN_STAFF_READ_PERMISSION_IDS = [
+  "manage_users",
+  "manage_admin_roles"
+];
+
+const ADMIN_CLIENT_MANAGEMENT_UPDATE_RULES = [
+  {
+    keys: ["status", "roles"],
+    permissionIds: ["manage_users"],
+    message: "You do not have permission to change client account status or roles."
+  },
+  {
+    keys: [
+      "verification.status",
+      "onboarding.verificationPending",
+      "clientWorkspace.statusControl.statusReason"
+    ],
+    permissionIds: ["approve_verification"],
+    message: "You do not have permission to update client verification."
+  },
+  {
+    keys: [
+      "entityProfile.businessType",
+      "entityProfile.businessName",
+      "entityProfile.country",
+      "entityProfile.currency"
+    ],
+    permissionIds: ["edit_client_settings", "manage_technical_client_config"],
+    message: "You do not have permission to update client settings."
+  },
+  {
+    keys: [
+      "clientWorkspace.statusControl.assignedToUid",
+      "clientWorkspace.statusControl.assignmentNotes",
+      "clientWorkspace.statusControl.tags"
+    ],
+    permissionIds: ["assign_clients_to_area"],
+    message: "You do not have permission to change client assignments."
+  },
+  {
+    keys: ["clientWorkspace.documents"],
+    permissionIds: [
+      "approve_documents",
+      "reject_documents",
+      "request_info_documents",
+      "comment_documents"
+    ],
+    message: "You do not have permission to update client documents."
+  },
+  {
+    keys: ["clientWorkspace.notifications"],
+    permissionIds: ["send_notifications"],
+    message: "You do not have permission to send client notifications."
+  },
+  {
+    keys: ["clientWorkspace.activityLog"],
+    permissionIds: [
+      "add_internal_notes",
+      "approve_documents",
+      "reject_documents",
+      "request_info_documents",
+      "comment_documents",
+      "approve_verification",
+      "edit_client_settings",
+      "manage_technical_client_config",
+      "assign_clients_to_area",
+      "send_notifications",
+      "manage_users"
+    ],
+    message: "You do not have permission to append client activity."
+  }
+];
+
+const ADMIN_STAFF_UPDATE_RULES = [
+  {
+    keys: [
+      "status",
+      "adminProfile.firstName",
+      "adminProfile.lastName",
+      "adminProfile.displayName",
+      "adminProfile.jobTitle",
+      "adminProfile.department",
+      "adminProfile.phone",
+      "adminProfile.timezone"
+    ],
+    permissionIds: ["manage_users"],
+    message: "You do not have permission to update admin staff profiles."
+  },
+  {
+    keys: [
+      "adminDashboard.securityPreferences",
+      "adminAccess.adminLevel",
+      "adminAccess.adminPermissions",
+      "adminAccess.mustChangePassword"
+    ],
+    permissionIds: ["manage_admin_roles"],
+    message: "You do not have permission to update admin roles or security settings."
+  }
+];
+
+const hasAnyPayloadKey = (payload = {}, keys = []) =>
+  keys.some((key) => Object.prototype.hasOwnProperty.call(payload, key));
+
+const findFirstPermissionError = ({
+  adminContext,
+  payload,
+  rules = [],
+  hasPermissionFn = hasAnyAdminPermission
+} = {}) => {
+  for (const rule of rules) {
+    if (!hasAnyPayloadKey(payload, rule.keys)) {
+      continue;
+    }
+    if (!hasPermissionFn(adminContext, rule.permissionIds)) {
+      return rule.message;
+    }
+  }
+  return "";
+};
+
+const resolveAdminActorContext = async (actor) => {
+  const actorUser = actor.uid
+    ? await ensureUserFromActor({
+        uid: actor.uid,
+        email: actor.email,
+        roles: actor.roles,
+        displayName: ""
+      })
+    : null;
+
+  return buildAdminAccessContext({
+    actor,
+    user: actorUser
+  });
+};
+
+const hasExplicitOrElevatedAdminPermission = (adminContext, permissionIds = []) => {
+  if (adminContext?.isElevated) {
+    return true;
+  }
+  if (!Array.isArray(permissionIds) || permissionIds.length === 0) {
+    return true;
+  }
+  const explicitPermissions = Array.isArray(adminContext?.adminPermissions)
+    ? adminContext.adminPermissions
+    : [];
+  return permissionIds.some((permissionId) => explicitPermissions.includes(permissionId));
 };
 
 export const getPublicPhoneAvailability = async (req, res, next) => {
@@ -112,6 +289,27 @@ export const postPublicNewsletter = async (req, res, next) => {
       }
     });
     return res.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getPublicClientTeamInviteByToken = async (req, res, next) => {
+  try {
+    const { errors, payload } = validatePublicClientTeamInviteQuery(req.query);
+    if (errors.length > 0) {
+      return res.status(400).json({ message: errors.join("; ") });
+    }
+
+    const invite = await getPublicClientTeamInvite({
+      token: payload.invite,
+      companyId: payload.companyId
+    });
+    if (!invite) {
+      return res.status(404).json({ message: "Team invite not found" });
+    }
+
+    return res.status(200).json(invite);
   } catch (error) {
     return next(error);
   }
@@ -375,6 +573,147 @@ export const getMeClientWorkspace = async (req, res, next) => {
   }
 };
 
+export const getMeClientTeam = async (req, res, next) => {
+  try {
+    const actor = getRequestActor(req);
+    if (!actor.uid) {
+      return res
+        .status(401)
+        .json({ message: "Missing x-user-id header from authenticated gateway request" });
+    }
+
+    const team = await getClientTeamByUid({
+      uid: actor.uid,
+      actorEmail: actor.email,
+      actorRoles: actor.roles
+    });
+    return res.status(200).json(team);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const postMeClientTeamInvite = async (req, res, next) => {
+  try {
+    const actor = getRequestActor(req);
+    if (!actor.uid) {
+      return res
+        .status(401)
+        .json({ message: "Missing x-user-id header from authenticated gateway request" });
+    }
+
+    const { errors, payload } = buildClientTeamInviteCreatePayload(req.body);
+    if (errors.length > 0) {
+      return res.status(400).json({ message: errors.join("; ") });
+    }
+
+    const result = await createClientTeamInviteByUid({
+      uid: actor.uid,
+      actorEmail: actor.email,
+      actorRoles: actor.roles,
+      payload
+    });
+    return res.status(201).json(result);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const postMeClientTeamInviteAccept = async (req, res, next) => {
+  try {
+    const actor = getRequestActor(req);
+    if (!actor.uid) {
+      return res
+        .status(401)
+        .json({ message: "Missing x-user-id header from authenticated gateway request" });
+    }
+
+    const { errors, payload } = buildClientTeamInviteAcceptPayload(req.body);
+    if (errors.length > 0) {
+      return res.status(400).json({ message: errors.join("; ") });
+    }
+
+    const result = await acceptClientTeamInviteByUid({
+      uid: actor.uid,
+      actorEmail: actor.email,
+      actorRoles: actor.roles,
+      payload
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const patchMeClientTeamInvite = async (req, res, next) => {
+  try {
+    const actor = getRequestActor(req);
+    if (!actor.uid) {
+      return res
+        .status(401)
+        .json({ message: "Missing x-user-id header from authenticated gateway request" });
+    }
+
+    const result = await cancelClientTeamInviteByUid({
+      uid: actor.uid,
+      actorEmail: actor.email,
+      actorRoles: actor.roles,
+      inviteId: req.params.inviteId
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const patchMeClientTeamMember = async (req, res, next) => {
+  try {
+    const actor = getRequestActor(req);
+    if (!actor.uid) {
+      return res
+        .status(401)
+        .json({ message: "Missing x-user-id header from authenticated gateway request" });
+    }
+
+    const { errors, payload } = buildClientTeamMemberUpdatePayload(req.body);
+    if (errors.length > 0) {
+      return res.status(400).json({ message: errors.join("; ") });
+    }
+
+    const result = await updateClientTeamMemberByUid({
+      uid: actor.uid,
+      actorEmail: actor.email,
+      actorRoles: actor.roles,
+      memberId: req.params.memberId,
+      payload
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const deleteMeClientTeamMember = async (req, res, next) => {
+  try {
+    const actor = getRequestActor(req);
+    if (!actor.uid) {
+      return res
+        .status(401)
+        .json({ message: "Missing x-user-id header from authenticated gateway request" });
+    }
+
+    const result = await removeClientTeamMemberByUid({
+      uid: actor.uid,
+      actorEmail: actor.email,
+      actorRoles: actor.roles,
+      memberId: req.params.memberId
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const patchMeClientWorkspace = async (req, res, next) => {
   try {
     const actor = getRequestActor(req);
@@ -423,8 +762,12 @@ export const getAdminClientManagement = async (req, res, next) => {
         .json({ message: "Missing x-user-id header from authenticated gateway request" });
     }
 
-    if (!isAdminActor(actor)) {
+    const adminContext = await resolveAdminActorContext(actor);
+    if (!adminContext.isAdmin) {
       return res.status(403).json({ message: "Only admin users can access client management." });
+    }
+    if (!hasAnyAdminPermission(adminContext, ADMIN_CLIENT_MANAGEMENT_LIST_PERMISSION_IDS)) {
+      return res.status(403).json({ message: "You do not have permission to access client management." });
     }
 
     const { errors, payload } = validateAdminClientManagementListQuery(req.query);
@@ -451,8 +794,12 @@ export const getAdminClientManagementClient = async (req, res, next) => {
         .json({ message: "Missing x-user-id header from authenticated gateway request" });
     }
 
-    if (!isAdminActor(actor)) {
+    const adminContext = await resolveAdminActorContext(actor);
+    if (!adminContext.isAdmin) {
       return res.status(403).json({ message: "Only admin users can access client management." });
+    }
+    if (!hasAnyAdminPermission(adminContext, ADMIN_CLIENT_MANAGEMENT_DETAIL_PERMISSION_IDS)) {
+      return res.status(403).json({ message: "You do not have permission to view this client." });
     }
 
     const client = await getClientManagementClientByUidForAdmin({
@@ -478,7 +825,8 @@ export const patchAdminClientManagementClient = async (req, res, next) => {
         .json({ message: "Missing x-user-id header from authenticated gateway request" });
     }
 
-    if (!isAdminActor(actor)) {
+    const adminContext = await resolveAdminActorContext(actor);
+    if (!adminContext.isAdmin) {
       return res.status(403).json({ message: "Only admin users can update client management." });
     }
 
@@ -492,6 +840,15 @@ export const patchAdminClientManagementClient = async (req, res, next) => {
         message:
           "Provide at least one field to update: status, roles, verificationStatus, verificationPending, businessType, businessName, country, currency, assignedToUid, assignmentNotes, statusReason, tags, documents, notifications, activityLog"
       });
+    }
+
+    const permissionErrorMessage = findFirstPermissionError({
+      adminContext,
+      payload,
+      rules: ADMIN_CLIENT_MANAGEMENT_UPDATE_RULES
+    });
+    if (permissionErrorMessage) {
+      return res.status(403).json({ message: permissionErrorMessage });
     }
 
     const updated = await updateClientManagementClientByUidForAdmin({
@@ -521,11 +878,12 @@ export const deleteAdminClientManagementClient = async (req, res, next) => {
         .json({ message: "Missing x-user-id header from authenticated gateway request" });
     }
 
-    if (!isAdminActor(actor)) {
+    const adminContext = await resolveAdminActorContext(actor);
+    if (!adminContext.isAdmin) {
       return res.status(403).json({ message: "Only admin users can delete client accounts." });
     }
-    if (!isElevatedAdminActor(actor)) {
-      return res.status(403).json({ message: "Only owner or superadmin users can delete client accounts." });
+    if (!hasExplicitOrElevatedAdminPermission(adminContext, ["delete_data"])) {
+      return res.status(403).json({ message: "You do not have permission to delete client accounts." });
     }
 
     const uid = String(req.params.uid || "").trim();
@@ -593,8 +951,12 @@ export const getAdminStaff = async (req, res, next) => {
         .json({ message: "Missing x-user-id header from authenticated gateway request" });
     }
 
-    if (!isAdminActor(actor)) {
+    const adminContext = await resolveAdminActorContext(actor);
+    if (!adminContext.isAdmin) {
       return res.status(403).json({ message: "Only admin users can access admin staff." });
+    }
+    if (!hasExplicitOrElevatedAdminPermission(adminContext, ADMIN_STAFF_READ_PERMISSION_IDS)) {
+      return res.status(403).json({ message: "You do not have permission to access admin staff." });
     }
 
     const payload = await listAdminStaffForAdmin();
@@ -625,7 +987,7 @@ export const patchMeAdminDashboard = async (req, res, next) => {
     if (Object.keys(payload).length === 0) {
       return res.status(400).json({
         message:
-          "Provide at least one admin dashboard field: defaultLandingPage, lastVisitedPage, compactMode, widgets, favoritePages, securityPreferences, adminProfile, supportLeads, newsletters"
+          "Provide at least one admin dashboard field: defaultLandingPage, lastVisitedPage, compactMode, widgets, favoritePages, securityPreferences, adminProfile, supportLeads, newsletters, workSessions, sentNotifications, notificationDrafts, scheduledNotifications, trashEntries"
       });
     }
 
@@ -656,8 +1018,9 @@ export const patchAdminStaffByUid = async (req, res, next) => {
         .json({ message: "Missing x-user-id header from authenticated gateway request" });
     }
 
-    if (!isElevatedAdminActor(actor)) {
-      return res.status(403).json({ message: "Only owner or superadmin users can update admin staff." });
+    const adminContext = await resolveAdminActorContext(actor);
+    if (!adminContext.isAdmin) {
+      return res.status(403).json({ message: "Only admin users can update admin staff." });
     }
 
     const { payload, errors } = buildAdminStaffUpdatePayload(req.body);
@@ -667,8 +1030,18 @@ export const patchAdminStaffByUid = async (req, res, next) => {
 
     if (Object.keys(payload).length === 0) {
       return res.status(400).json({
-        message: "Provide at least one field: status, adminProfile, adminAccess"
+        message: "Provide at least one field: status, securityPreferences, adminProfile, adminAccess"
       });
+    }
+
+    const permissionErrorMessage = findFirstPermissionError({
+      adminContext,
+      payload,
+      rules: ADMIN_STAFF_UPDATE_RULES,
+      hasPermissionFn: hasExplicitOrElevatedAdminPermission
+    });
+    if (permissionErrorMessage) {
+      return res.status(403).json({ message: permissionErrorMessage });
     }
 
     const updated = await updateAdminStaffByUid({
@@ -753,6 +1126,15 @@ export const putById = async (req, res, next) => {
       });
     }
 
+    if (actorIsAdmin && targetUser.uid !== actor.uid) {
+      const adminContext = await resolveAdminActorContext(actor);
+      if (!hasExplicitOrElevatedAdminPermission(adminContext, ["manage_users"])) {
+        return res.status(403).json({
+          message: "You do not have permission to update another user's profile."
+        });
+      }
+    }
+
     const updated = await updateUser({
       id: req.params.id,
       payload
@@ -773,11 +1155,12 @@ export const removeById = async (req, res, next) => {
         .json({ message: "Missing x-user-id header from authenticated gateway request" });
     }
 
-    if (!isAdminActor(actor)) {
+    const adminContext = await resolveAdminActorContext(actor);
+    if (!adminContext.isAdmin) {
       return res.status(403).json({ message: "Only admin users can delete accounts." });
     }
-    if (!isElevatedAdminActor(actor)) {
-      return res.status(403).json({ message: "Only owner or superadmin users can delete other accounts." });
+    if (!hasExplicitOrElevatedAdminPermission(adminContext, ["delete_data"])) {
+      return res.status(403).json({ message: "You do not have permission to delete other accounts." });
     }
 
     const reason = resolveAccountDeletionReason(req.body, "admin-account-deleted");

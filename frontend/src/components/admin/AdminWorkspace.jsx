@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   canAccessAdminPage,
+  hydrateAdminDashboardStorageFromBackend,
   AdminSidebar,
   AdminTopBar,
   AdminDashboardPage,
@@ -470,6 +471,28 @@ function AdminWorkspace({
   useEffect(() => {
     activePageRef.current = activePage
   }, [activePage])
+
+  useEffect(() => {
+    if (!currentAdminEmail) return undefined
+
+    let cancelled = false
+    const hydrateAdminStorage = async () => {
+      const result = await hydrateAdminDashboardStorageFromBackend()
+      if (cancelled || !result?.ok) return
+      setSearchIndexRevision((value) => value + 1)
+    }
+
+    void hydrateAdminStorage()
+    const handleWindowFocus = () => {
+      void hydrateAdminStorage()
+    }
+
+    window.addEventListener('focus', handleWindowFocus)
+    return () => {
+      cancelled = true
+      window.removeEventListener('focus', handleWindowFocus)
+    }
+  }, [currentAdminEmail])
 
   useEffect(() => {
     if (!selectedClientContext?.email) return

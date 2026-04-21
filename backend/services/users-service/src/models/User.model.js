@@ -208,6 +208,18 @@ const clientWorkspaceSchema = new mongoose.Schema(
       type: [mongoose.Schema.Types.Mixed],
       default: []
     },
+    teamMembers: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: []
+    },
+    teamInvites: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: []
+    },
+    teamAccess: {
+      type: mongoose.Schema.Types.Mixed,
+      default: () => ({})
+    },
     accountSettings: {
       type: mongoose.Schema.Types.Mixed,
       default: () => ({})
@@ -343,6 +355,26 @@ const adminDashboardSchema = new mongoose.Schema(
     },
     newsletters: {
       type: [newsletterRecipientSchema],
+      default: []
+    },
+    workSessions: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: []
+    },
+    sentNotifications: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: []
+    },
+    notificationDrafts: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: []
+    },
+    scheduledNotifications: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: []
+    },
+    trashEntries: {
+      type: [mongoose.Schema.Types.Mixed],
       default: []
     },
     stats: {

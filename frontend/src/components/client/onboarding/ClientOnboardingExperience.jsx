@@ -113,22 +113,53 @@ const buildFullName = (payload = {}) => (
     .trim()
 )
 
-function OnboardingExperience({ currentStep, setCurrentStep, data, setData, onSkip, onComplete, showToast }) {
+const formatBusinessTypeLabel = (value = '') => {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (normalized === 'business') return 'Business'
+  if (normalized === 'non-profit' || normalized === 'non profit' || normalized === 'nonprofit') return 'Non-Profit'
+  if (normalized === 'individual') return 'Individual'
+  return String(value || '').trim()
+}
+
+function OnboardingExperience({
+  currentStep,
+  setCurrentStep,
+  data,
+  setData,
+  onSkip,
+  onComplete,
+  showToast,
+  teamAffiliation = null,
+}) {
   const [errors, setErrors] = useState({})
 
   const resolvedCurrentStep = Math.min(TOTAL_ONBOARDING_STEPS, Math.max(1, Number(currentStep) || 1))
   const safeData = data && typeof data === 'object' ? data : {}
-  const isBusinessEntity = safeData.businessType === 'Business' || safeData.businessType === 'Non-Profit'
-  const isNigeriaRegistration = (safeData.country || '').trim().toLowerCase() === 'nigeria'
-  const registrationNumberLabel = isNigeriaRegistration || !safeData.country ? 'CAC Registration Number' : 'Business Registration Number'
-  const registrationPlaceholder = isNigeriaRegistration || !safeData.country ? 'e.g., BN123456, RC123456, or IT123456' : 'e.g., BR123456'
+  const isAffiliatedTeamMember = Boolean(teamAffiliation?.isTeamMember)
+  const workspaceDetails = {
+    businessType: String(safeData.businessType || teamAffiliation?.businessType || '').trim(),
+    businessName: String(safeData.businessName || teamAffiliation?.companyName || '').trim(),
+    country: String(safeData.country || teamAffiliation?.country || '').trim(),
+    currency: String(safeData.currency || teamAffiliation?.currency || 'NGN').trim() || 'NGN',
+    industry: String(safeData.industry || teamAffiliation?.industry || '').trim(),
+    industryOther: String(safeData.industryOther || teamAffiliation?.industryOther || '').trim(),
+    cacNumber: String(safeData.cacNumber || teamAffiliation?.cacNumber || '').trim(),
+    tin: String(safeData.tin || teamAffiliation?.tin || '').trim(),
+    reportingCycle: String(safeData.reportingCycle || teamAffiliation?.reportingCycle || '').trim(),
+    startMonth: String(safeData.startMonth || teamAffiliation?.startMonth || '').trim(),
+  }
+  const businessTypeLabel = formatBusinessTypeLabel(workspaceDetails.businessType)
+  const isBusinessEntity = businessTypeLabel === 'Business' || businessTypeLabel === 'Non-Profit'
+  const isNigeriaRegistration = (workspaceDetails.country || '').trim().toLowerCase() === 'nigeria'
+  const registrationNumberLabel = isNigeriaRegistration || !workspaceDetails.country ? 'CAC Registration Number' : 'Business Registration Number'
+  const registrationPlaceholder = isNigeriaRegistration || !workspaceDetails.country ? 'e.g., BN123456, RC123456, or IT123456' : 'e.g., BR123456'
   const stepTitle = [
     'Confirm your profile',
-    'Set up your business workspace',
+    isAffiliatedTeamMember ? 'Review your team workspace' : 'Set up your business workspace',
   ][resolvedCurrentStep - 1]
   const resolvedCurrencyCode = String(
-    safeData.currency
-    || COUNTRY_BASE_CURRENCY_MAP[String(safeData.country || '').trim()]
+    workspaceDetails.currency
+    || COUNTRY_BASE_CURRENCY_MAP[String(workspaceDetails.country || '').trim()]
     || 'NGN',
   ).trim().toUpperCase() || 'NGN'
   const resolvedCurrency = BASE_CURRENCY_LABEL_MAP[resolvedCurrencyCode] || `${resolvedCurrencyCode} - Base currency`
@@ -191,23 +222,26 @@ function OnboardingExperience({ currentStep, setCurrentStep, data, setData, onSk
       if (!String(safeData.language || '').trim()) nextErrors.language = 'Preferred language is required.'
     }
     if (resolvedCurrentStep === 2) {
-      if (!String(safeData.businessType || '').trim()) nextErrors.businessType = 'Business type is required.'
-      if (!String(safeData.businessName || '').trim()) nextErrors.businessName = 'Legal business name is required.'
-      if (!String(safeData.country || '').trim()) nextErrors.country = 'Country is required.'
-      if (!String(safeData.industry || '').trim()) nextErrors.industry = 'Industry is required.'
-      if (safeData.industry === 'Others' && !String(safeData.industryOther || '').trim()) {
+      if (isAffiliatedTeamMember) {
+        return nextErrors
+      }
+      if (!String(workspaceDetails.businessType || '').trim()) nextErrors.businessType = 'Business type is required.'
+      if (!String(workspaceDetails.businessName || '').trim()) nextErrors.businessName = 'Legal business name is required.'
+      if (!String(workspaceDetails.country || '').trim()) nextErrors.country = 'Country is required.'
+      if (!String(workspaceDetails.industry || '').trim()) nextErrors.industry = 'Industry is required.'
+      if (workspaceDetails.industry === 'Others' && !String(workspaceDetails.industryOther || '').trim()) {
         nextErrors.industryOther = 'Please specify your industry.'
       }
       if (isBusinessEntity) {
-        const normalizedRegistration = sanitizeAlphaNumeric(safeData.cacNumber)
+        const normalizedRegistration = sanitizeAlphaNumeric(workspaceDetails.cacNumber)
         if (!normalizedRegistration) {
           nextErrors.cacNumber = 'Registration number is required.'
         } else if (!/^(RC|BN|IT|LP|LLP)/.test(normalizedRegistration)) {
           nextErrors.cacNumber = 'Registration number must start with RC, BN, IT, LP, or LLP.'
         }
       }
-      if (!String(safeData.startMonth || '').trim()) nextErrors.startMonth = 'Financial year start is required.'
-      if (!String(safeData.reportingCycle || '').trim()) nextErrors.reportingCycle = 'Financial year end is required.'
+      if (!String(workspaceDetails.startMonth || '').trim()) nextErrors.startMonth = 'Financial year start is required.'
+      if (!String(workspaceDetails.reportingCycle || '').trim()) nextErrors.reportingCycle = 'Financial year end is required.'
     }
     return nextErrors
   }
@@ -232,10 +266,16 @@ function OnboardingExperience({ currentStep, setCurrentStep, data, setData, onSk
       scrollToFirstInvalid(nextErrors)
       return
     }
+    const finalWorkspaceData = resolvedCurrentStep === 2 && isAffiliatedTeamMember
+      ? {
+          ...safeData,
+          ...workspaceDetails,
+        }
+      : safeData
     onComplete({
-      ...safeData,
+      ...finalWorkspaceData,
       currency: resolvedCurrencyCode,
-      primaryContact: buildFullName(safeData),
+      primaryContact: buildFullName(finalWorkspaceData),
     })
   }
 
@@ -253,7 +293,11 @@ function OnboardingExperience({ currentStep, setCurrentStep, data, setData, onSk
             <p className="text-sm text-text-secondary mt-2">
               {resolvedCurrentStep === 1
                 ? 'Confirm the profile details that will be used across your client workspace.'
-                : 'Set the business and accounting basics Kiamina needs to prepare your workspace correctly.'}
+                : (
+                    isAffiliatedTeamMember
+                      ? 'Your account is joining an existing workspace. Review the company details inherited from the workspace owner before finishing setup.'
+                      : 'Set the business and accounting basics Kiamina needs to prepare your workspace correctly.'
+                  )}
             </p>
           </div>
           <button type="button" onClick={onSkip} className="h-9 px-4 border border-border rounded-md text-sm font-medium text-text-secondary hover:bg-background transition-colors">
@@ -366,131 +410,206 @@ function OnboardingExperience({ currentStep, setCurrentStep, data, setData, onSk
 
         {resolvedCurrentStep === 2 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1.5">Business Type</label>
-              <select
-                id="onboarding-businessType"
-                value={safeData.businessType || ''}
-                onChange={(event) => updateField('businessType', event.target.value)}
-                className={`w-full h-10 px-3 border rounded-md text-sm ${errors.businessType ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
-              >
-                <option value="">Select business type</option>
-                <option value="Business">Business</option>
-                <option value="Non-Profit">Non-Profit</option>
-                <option value="Individual">Individual</option>
-              </select>
-              {errors.businessType && <p className="text-xs text-error mt-1">{errors.businessType}</p>}
-            </div>
+            {isAffiliatedTeamMember ? (
+              <>
+                <div className="md:col-span-2 rounded-md border border-primary/20 bg-primary/5 px-4 py-3">
+                  <p className="text-sm font-semibold text-text-primary">Team workspace affiliation</p>
+                  <p className="text-sm text-text-secondary mt-1">
+                    This account will join {teamAffiliation?.companyName || 'your team workspace'}
+                    {teamAffiliation?.ownerName ? `, managed by ${teamAffiliation.ownerName}` : ''}.
+                  </p>
+                </div>
 
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1.5">Legal Business Name</label>
-              <input
-                id="onboarding-businessName"
-                type="text"
-                value={safeData.businessName || ''}
-                onChange={(event) => updateField('businessName', event.target.value)}
-                className={`w-full h-10 px-3 border rounded-md text-sm ${errors.businessName ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
-              />
-              {errors.businessName && <p className="text-xs text-error mt-1">{errors.businessName}</p>}
-            </div>
+                <div className="rounded-md border border-border-light bg-background/50 px-3 py-2.5">
+                  <p className="text-xs uppercase tracking-wide text-text-muted">Business Type</p>
+                  <p className="text-sm font-medium text-text-primary mt-1">{businessTypeLabel || '--'}</p>
+                  {errors.businessType && <p className="text-xs text-error mt-1">{errors.businessType}</p>}
+                </div>
 
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1.5">Country of Registration / Primary Operation</label>
-              <select
-                id="onboarding-country"
-                value={safeData.country || ''}
-                onChange={(event) => updateField('country', event.target.value)}
-                className={`w-full h-10 px-3 border rounded-md text-sm ${errors.country ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
-              >
-                <option value="">Select country</option>
-                <option value="Nigeria">Nigeria</option>
-                <option value="United States">United States</option>
-                <option value="United Kingdom">United Kingdom</option>
-                <option value="Canada">Canada</option>
-                <option value="Australia">Australia</option>
-              </select>
-              {errors.country && <p className="text-xs text-error mt-1">{errors.country}</p>}
-            </div>
+                <div className="rounded-md border border-border-light bg-background/50 px-3 py-2.5">
+                  <p className="text-xs uppercase tracking-wide text-text-muted">Legal Business Name</p>
+                  <p className="text-sm font-medium text-text-primary mt-1">{workspaceDetails.businessName || '--'}</p>
+                  {errors.businessName && <p className="text-xs text-error mt-1">{errors.businessName}</p>}
+                </div>
 
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1.5">Industry</label>
-              <select
-                id="onboarding-industry"
-                value={safeData.industry || ''}
-                onChange={(event) => updateField('industry', event.target.value)}
-                className={`w-full h-10 px-3 border rounded-md text-sm ${errors.industry ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
-              >
-                <option value="">Select industry</option>
-                {INDUSTRY_OPTIONS.map((industry) => <option key={industry} value={industry}>{industry}</option>)}
-              </select>
-              {errors.industry && <p className="text-xs text-error mt-1">{errors.industry}</p>}
-            </div>
+                <div className="rounded-md border border-border-light bg-background/50 px-3 py-2.5">
+                  <p className="text-xs uppercase tracking-wide text-text-muted">Country of Registration / Primary Operation</p>
+                  <p className="text-sm font-medium text-text-primary mt-1">{workspaceDetails.country || '--'}</p>
+                  {errors.country && <p className="text-xs text-error mt-1">{errors.country}</p>}
+                </div>
 
-            {safeData.industry === 'Others' && (
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-text-primary mb-1.5">Specify Industry</label>
-                <input
-                  id="onboarding-industryOther"
-                  type="text"
-                  value={safeData.industryOther || ''}
-                  onChange={(event) => updateField('industryOther', event.target.value)}
-                  className={`w-full h-10 px-3 border rounded-md text-sm ${errors.industryOther ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
-                />
-                {errors.industryOther && <p className="text-xs text-error mt-1">{errors.industryOther}</p>}
-              </div>
+                <div className="rounded-md border border-border-light bg-background/50 px-3 py-2.5">
+                  <p className="text-xs uppercase tracking-wide text-text-muted">Industry</p>
+                  <p className="text-sm font-medium text-text-primary mt-1">
+                    {workspaceDetails.industry === 'Others' && workspaceDetails.industryOther
+                      ? workspaceDetails.industryOther
+                      : (workspaceDetails.industry || '--')}
+                  </p>
+                  {errors.industry && <p className="text-xs text-error mt-1">{errors.industry}</p>}
+                  {errors.industryOther && <p className="text-xs text-error mt-1">{errors.industryOther}</p>}
+                </div>
+
+                {isBusinessEntity && (
+                  <div className="md:col-span-2 rounded-md border border-border-light bg-background/50 px-3 py-2.5">
+                    <p className="text-xs uppercase tracking-wide text-text-muted">{registrationNumberLabel}</p>
+                    <p className="text-sm font-medium text-text-primary mt-1">{workspaceDetails.cacNumber || '--'}</p>
+                    {errors.cacNumber && <p className="text-xs text-error mt-1">{errors.cacNumber}</p>}
+                  </div>
+                )}
+
+                <div className="rounded-md border border-border-light bg-background/50 px-3 py-2.5">
+                  <p className="text-xs uppercase tracking-wide text-text-muted">Financial Year Start</p>
+                  <p className="text-sm font-medium text-text-primary mt-1">
+                    {getFinancialBoundaryMonth(workspaceDetails.startMonth)
+                      ? FINANCIAL_MONTH_OPTIONS.find((option) => option.value === getFinancialBoundaryMonth(workspaceDetails.startMonth))?.label || '--'
+                      : '--'}
+                  </p>
+                  {errors.startMonth && <p className="text-xs text-error mt-1">{errors.startMonth}</p>}
+                </div>
+
+                <div className="rounded-md border border-border-light bg-background/50 px-3 py-2.5">
+                  <p className="text-xs uppercase tracking-wide text-text-muted">Financial Year End</p>
+                  <p className="text-sm font-medium text-text-primary mt-1">
+                    {getFinancialBoundaryMonth(workspaceDetails.reportingCycle)
+                      ? FINANCIAL_MONTH_OPTIONS.find((option) => option.value === getFinancialBoundaryMonth(workspaceDetails.reportingCycle))?.label || '--'
+                      : '--'}
+                  </p>
+                  {errors.reportingCycle && <p className="text-xs text-error mt-1">{errors.reportingCycle}</p>}
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-1.5">Business Type</label>
+                  <select
+                    id="onboarding-businessType"
+                    value={safeData.businessType || ''}
+                    onChange={(event) => updateField('businessType', event.target.value)}
+                    className={`w-full h-10 px-3 border rounded-md text-sm ${errors.businessType ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
+                  >
+                    <option value="">Select business type</option>
+                    <option value="Business">Business</option>
+                    <option value="Non-Profit">Non-Profit</option>
+                    <option value="Individual">Individual</option>
+                  </select>
+                  {errors.businessType && <p className="text-xs text-error mt-1">{errors.businessType}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-1.5">Legal Business Name</label>
+                  <input
+                    id="onboarding-businessName"
+                    type="text"
+                    value={safeData.businessName || ''}
+                    onChange={(event) => updateField('businessName', event.target.value)}
+                    className={`w-full h-10 px-3 border rounded-md text-sm ${errors.businessName ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
+                  />
+                  {errors.businessName && <p className="text-xs text-error mt-1">{errors.businessName}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-1.5">Country of Registration / Primary Operation</label>
+                  <select
+                    id="onboarding-country"
+                    value={safeData.country || ''}
+                    onChange={(event) => updateField('country', event.target.value)}
+                    className={`w-full h-10 px-3 border rounded-md text-sm ${errors.country ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
+                  >
+                    <option value="">Select country</option>
+                    <option value="Nigeria">Nigeria</option>
+                    <option value="United States">United States</option>
+                    <option value="United Kingdom">United Kingdom</option>
+                    <option value="Canada">Canada</option>
+                    <option value="Australia">Australia</option>
+                  </select>
+                  {errors.country && <p className="text-xs text-error mt-1">{errors.country}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-1.5">Industry</label>
+                  <select
+                    id="onboarding-industry"
+                    value={safeData.industry || ''}
+                    onChange={(event) => updateField('industry', event.target.value)}
+                    className={`w-full h-10 px-3 border rounded-md text-sm ${errors.industry ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
+                  >
+                    <option value="">Select industry</option>
+                    {INDUSTRY_OPTIONS.map((industry) => <option key={industry} value={industry}>{industry}</option>)}
+                  </select>
+                  {errors.industry && <p className="text-xs text-error mt-1">{errors.industry}</p>}
+                </div>
+
+                {safeData.industry === 'Others' && (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">Specify Industry</label>
+                    <input
+                      id="onboarding-industryOther"
+                      type="text"
+                      value={safeData.industryOther || ''}
+                      onChange={(event) => updateField('industryOther', event.target.value)}
+                      className={`w-full h-10 px-3 border rounded-md text-sm ${errors.industryOther ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
+                    />
+                    {errors.industryOther && <p className="text-xs text-error mt-1">{errors.industryOther}</p>}
+                  </div>
+                )}
+
+                {isBusinessEntity && (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-text-primary mb-1.5">{registrationNumberLabel}</label>
+                    <input
+                      id="onboarding-cacNumber"
+                      type="text"
+                      value={safeData.cacNumber || ''}
+                      onChange={(event) => updateField('cacNumber', event.target.value)}
+                      placeholder={registrationPlaceholder}
+                      className={`w-full h-10 px-3 border rounded-md text-sm ${errors.cacNumber ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
+                    />
+                    {errors.cacNumber && <p className="text-xs text-error mt-1">{errors.cacNumber}</p>}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-1.5">Financial Year Start</label>
+                  <select
+                    id="onboarding-startMonth"
+                    value={getFinancialBoundaryMonth(safeData.startMonth)}
+                    onChange={(event) => updateField('startMonth', event.target.value)}
+                    className={`w-full h-10 px-3 border rounded-md text-sm ${errors.startMonth ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
+                  >
+                    <option value="">Select month</option>
+                    {FINANCIAL_MONTH_OPTIONS.map((option) => (
+                      <option key={`start-${option.value}`} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  {errors.startMonth && <p className="text-xs text-error mt-1">{errors.startMonth}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-1.5">Financial Year End</label>
+                  <select
+                    id="onboarding-reportingCycle"
+                    value={getFinancialBoundaryMonth(safeData.reportingCycle)}
+                    onChange={(event) => updateField('reportingCycle', event.target.value)}
+                    className={`w-full h-10 px-3 border rounded-md text-sm ${errors.reportingCycle ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
+                  >
+                    <option value="">Select month</option>
+                    {FINANCIAL_MONTH_OPTIONS.map((option) => (
+                      <option key={`end-${option.value}`} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  {errors.reportingCycle && <p className="text-xs text-error mt-1">{errors.reportingCycle}</p>}
+                </div>
+              </>
             )}
-
-            {isBusinessEntity && (
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-text-primary mb-1.5">{registrationNumberLabel}</label>
-                <input
-                  id="onboarding-cacNumber"
-                  type="text"
-                  value={safeData.cacNumber || ''}
-                  onChange={(event) => updateField('cacNumber', event.target.value)}
-                  placeholder={registrationPlaceholder}
-                  className={`w-full h-10 px-3 border rounded-md text-sm ${errors.cacNumber ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
-                />
-                {errors.cacNumber && <p className="text-xs text-error mt-1">{errors.cacNumber}</p>}
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1.5">Financial Year Start</label>
-              <select
-                id="onboarding-startMonth"
-                value={getFinancialBoundaryMonth(safeData.startMonth)}
-                onChange={(event) => updateField('startMonth', event.target.value)}
-                className={`w-full h-10 px-3 border rounded-md text-sm ${errors.startMonth ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
-              >
-                <option value="">Select month</option>
-                {FINANCIAL_MONTH_OPTIONS.map((option) => (
-                  <option key={`start-${option.value}`} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              {errors.startMonth && <p className="text-xs text-error mt-1">{errors.startMonth}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-text-primary mb-1.5">Financial Year End</label>
-              <select
-                id="onboarding-reportingCycle"
-                value={getFinancialBoundaryMonth(safeData.reportingCycle)}
-                onChange={(event) => updateField('reportingCycle', event.target.value)}
-                className={`w-full h-10 px-3 border rounded-md text-sm ${errors.reportingCycle ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
-              >
-                <option value="">Select month</option>
-                {FINANCIAL_MONTH_OPTIONS.map((option) => (
-                  <option key={`end-${option.value}`} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              {errors.reportingCycle && <p className="text-xs text-error mt-1">{errors.reportingCycle}</p>}
-            </div>
 
             <div className="md:col-span-2 rounded-md border border-border-light bg-background/50 px-3 py-2.5">
               <p className="text-xs uppercase tracking-wide text-text-muted">Base Currency</p>
               <p className="text-sm font-medium text-text-primary mt-1">{resolvedCurrency}</p>
-              <p className="text-xs text-text-secondary mt-1">Currency is set automatically from the selected country.</p>
+              <p className="text-xs text-text-secondary mt-1">
+                {isAffiliatedTeamMember
+                  ? 'This currency is inherited from the workspace you are joining.'
+                  : 'Currency is set automatically from the selected country.'}
+              </p>
             </div>
           </div>
         )}

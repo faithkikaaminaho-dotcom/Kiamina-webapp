@@ -1,4 +1,8 @@
-import { getRequestActor, isAdminActor } from "../utils/request-actor.js";
+import {
+  getRequestActor,
+  hasAnyAdminPermission,
+  isAdminActor
+} from "../utils/request-actor.js";
 import {
   createKnowledgeBaseArticleForActor,
   deleteKnowledgeBaseArticleForActor,
@@ -38,9 +42,28 @@ const requireAdminActor = (req, res) => {
   return actor;
 };
 
+const requireAdminPermission = (req, res, permissionIds = [], message) => {
+  const actor = requireAdminActor(req, res);
+  if (!actor) return null;
+
+  if (!hasAnyAdminPermission(actor, permissionIds)) {
+    res.status(403).json({
+      message: message || "You do not have permission to perform this action."
+    });
+    return null;
+  }
+
+  return actor;
+};
+
 export const createArticle = async (req, res, next) => {
   try {
-    const actor = requireAdminActor(req, res);
+    const actor = requireAdminPermission(
+      req,
+      res,
+      ["client_assistance"],
+      "You do not have permission to manage knowledge base articles."
+    );
     if (!actor) return;
 
     const { errors, payload } = validateCreateKnowledgeBaseArticlePayload(req.body);
@@ -115,7 +138,12 @@ export const getArticleById = async (req, res, next) => {
 
 export const patchArticle = async (req, res, next) => {
   try {
-    const actor = requireAdminActor(req, res);
+    const actor = requireAdminPermission(
+      req,
+      res,
+      ["client_assistance"],
+      "You do not have permission to manage knowledge base articles."
+    );
     if (!actor) return;
 
     const { payload, errors } = buildKnowledgeBaseArticleUpdatePayload(req.body);
@@ -143,7 +171,12 @@ export const patchArticle = async (req, res, next) => {
 
 export const deleteArticle = async (req, res, next) => {
   try {
-    const actor = requireAdminActor(req, res);
+    const actor = requireAdminPermission(
+      req,
+      res,
+      ["client_assistance"],
+      "You do not have permission to manage knowledge base articles."
+    );
     if (!actor) return;
 
     const deleted = await deleteKnowledgeBaseArticleForActor({

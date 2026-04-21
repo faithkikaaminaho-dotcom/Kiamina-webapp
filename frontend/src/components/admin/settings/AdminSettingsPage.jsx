@@ -1183,24 +1183,6 @@ function AdminSettingsPage({
       notify('error', message)
       return
     }
-    if (!isCreatingOwner && !normalizedResidentialAddress) {
-      const message = 'Residential address is required for this admin role.'
-      setFormError(message)
-      notify('error', message)
-      return
-    }
-    if (!isCreatingOwner && (!normalizedGovernmentIdType || !normalizedGovernmentIdNumber)) {
-      const message = 'Government ID details are required for this admin role.'
-      setFormError(message)
-      notify('error', message)
-      return
-    }
-    if (!isCreatingOwner && normalizedGovernmentIdNumber.length < 4) {
-      const message = 'Enter a valid government ID number.'
-      setFormError(message)
-      notify('error', message)
-      return
-    }
     if (isCreatingOwner && normalizedOwnerPrivateKey.length < 12) {
       const message = 'Owner private key must be at least 12 characters.'
       setFormError(message)
@@ -1209,12 +1191,6 @@ function AdminSettingsPage({
     }
     if (!passwordStrengthRegex.test(createAdminForm.password)) {
       const message = 'Admin password must include at least one number and one special character.'
-      setFormError(message)
-      notify('error', message)
-      return
-    }
-    if (!isCreatingOwner && createAdminIdentityVerification.status !== 'verified') {
-      const message = 'Submit identity verification before creating this admin.'
       setFormError(message)
       notify('error', message)
       return
@@ -2919,8 +2895,11 @@ function AdminSettingsPage({
                             className="h-9 px-3 border border-primary text-primary rounded-md text-xs font-semibold hover:bg-primary-tint transition-colors disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
                           >
                             {isCreateAdminIdentityVerifying && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                            {isCreateAdminIdentityVerifying ? 'Identifying...' : 'Submit for Verification'}
+                            {isCreateAdminIdentityVerifying ? 'Checking...' : 'Optional Identity Check'}
                           </button>
+                          <p className="text-xs text-text-muted">
+                            Verification is optional in the MVP. You can create the admin account without completing this step.
+                          </p>
                           {createAdminIdentityVerification.message && (
                             <p
                               className={`text-xs ${
@@ -2939,12 +2918,12 @@ function AdminSettingsPage({
                     )}
                     {isCreateAdminOwnerLevel && (
                       <div className="rounded-md border border-border-light bg-[#FAFBFF] px-3 py-2">
-                        <p className="text-xs text-text-secondary">Owner role skips government ID verification.</p>
+                        <p className="text-xs text-text-secondary">Government ID verification is optional in the MVP.</p>
                       </div>
                     )}
                     <input
                       type="text"
-                      placeholder={isCreateAdminOwnerLevel ? 'Residential Address (Optional)' : 'Residential Address'}
+                      placeholder="Residential Address (Optional)"
                       value={createAdminForm.residentialAddress}
                       onChange={(event) => setCreateAdminForm((prev) => ({ ...prev, residentialAddress: event.target.value }))}
                       className="w-full h-10 px-3 border border-border rounded-md text-sm focus:outline-none focus:border-primary"

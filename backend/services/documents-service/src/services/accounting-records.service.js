@@ -7,6 +7,7 @@ import {
   listAccountingRecords,
   monthlyCashflowSummary,
   monthlyProfitLossSummary,
+  reassignAccountingRecordsByOwner,
   summarizeAccountingRecords,
   updateAccountingRecordById
 } from "../repositories/accounting-records.repository.js";
@@ -435,6 +436,15 @@ export const removeRecordById = async (id) => deleteAccountingRecordById(id);
 
 export const removeRecordsByOwner = async (ownerUserId) =>
   deleteAccountingRecordsByOwner(ownerUserId);
+
+export const reassignRecordsByOwner = async ({
+  fromOwnerUserId,
+  toOwnerUserId
+}) =>
+  reassignAccountingRecordsByOwner({
+    fromOwnerUserId,
+    toOwnerUserId
+  });
 
 export const getRecords = async (filters) => listAccountingRecords(filters);
 

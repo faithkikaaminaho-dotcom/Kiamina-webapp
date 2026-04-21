@@ -7,9 +7,13 @@ import {
   getDocumentsByOwner,
   getDocumentStorageRefsByOwner,
   getDocumentSummaryByOwner,
+  reassignDocumentsForOwner,
   updateDocument
 } from "../services/documents.service.js";
-import { removeRecordsByOwner } from "../services/accounting-records.service.js";
+import {
+  reassignRecordsByOwner,
+  removeRecordsByOwner
+} from "../services/accounting-records.service.js";
 import {
   createSignedDownloadUrl,
   deleteStorageObject,
@@ -19,6 +23,7 @@ import {
 } from "../services/mongodb-storage.service.js";
 import {
   getRequestActor,
+  hasAnyAdminPermission,
   isAdminActor,
   isPrivilegedActor
 } from "../utils/request-actor.js";
@@ -40,6 +45,21 @@ const requireActor = (req, res) => {
   }
 
   return actor;
+};
+
+const assertAdminDocumentPermission = (res, actor, permissionIds = [], message) => {
+  if (!isAdminActor(actor)) {
+    return true;
+  }
+
+  if (hasAnyAdminPermission(actor, permissionIds)) {
+    return true;
+  }
+
+  res.status(403).json({
+    message: message || "You do not have permission to perform this document action."
+  });
+  return false;
 };
 
 export const createOne = async (req, res, next) => {
@@ -84,6 +104,18 @@ export const listByOwner = async (req, res, next) => {
         message: "You can only list your own documents."
       });
     }
+    if (
+      actorIsPrivileged
+      && ownerUserId !== actor.uid
+      && !assertAdminDocumentPermission(
+        res,
+        actor,
+        ["view_documents"],
+        "You do not have permission to view another user's documents."
+      )
+    ) {
+      return;
+    }
 
     const documents = await getDocumentsByOwner(ownerUserId);
     return res.status(200).json(documents);
@@ -106,6 +138,18 @@ export const getOwnerSummary = async (req, res, next) => {
       return res.status(403).json({
         message: "You can only view summary for your own documents."
       });
+    }
+    if (
+      actorIsPrivileged
+      && ownerUserId !== actor.uid
+      && !assertAdminDocumentPermission(
+        res,
+        actor,
+        ["view_documents"],
+        "You do not have permission to view another user's document summary."
+      )
+    ) {
+      return;
     }
 
     const summary = await getDocumentSummaryByOwner(ownerUserId);
@@ -131,6 +175,18 @@ export const getById = async (req, res, next) => {
     if (!actorIsPrivileged && document.ownerUserId !== actor.uid) {
       return res.status(403).json({ message: "You cannot access this document." });
     }
+    if (
+      actorIsPrivileged
+      && document.ownerUserId !== actor.uid
+      && !assertAdminDocumentPermission(
+        res,
+        actor,
+        ["view_documents"],
+        "You do not have permission to access another user's document."
+      )
+    ) {
+      return;
+    }
 
     return res.status(200).json(document);
   } catch (error) {
@@ -149,6 +205,16 @@ export const updateStatus = async (req, res, next) => {
       return res.status(403).json({
         message: "Only privileged users can change document status."
       });
+    }
+    if (
+      !assertAdminDocumentPermission(
+        res,
+        actor,
+        ["approve_documents", "reject_documents", "request_info_documents"],
+        "You do not have permission to change document status."
+      )
+    ) {
+      return;
     }
 
     const { status, error } = validateStatusPayload(req.body);
@@ -278,6 +344,18 @@ export const removeByOwner = async (req, res, next) => {
         message: "You can only purge your own documents."
       });
     }
+    if (
+      actorIsAdmin
+      && ownerUserId !== actor.uid
+      && !assertAdminDocumentPermission(
+        res,
+        actor,
+        ["delete_data"],
+        "You do not have permission to purge another user's documents."
+      )
+    ) {
+      return;
+    }
 
     const storageRefs = await getDocumentStorageRefsByOwner(ownerUserId);
     const [documentsDeletionResult, accountingDeletionResult] = await Promise.all([
@@ -313,6 +391,73 @@ export const removeByOwner = async (req, res, next) => {
       deletedAccountingRecords: Number(accountingDeletionResult?.deletedCount || 0),
       deletedStorageObjects: storageDeletedCount,
       failedStorageObjectDeletes: storageFailedCount
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const reassignByOwner = async (req, res, next) => {
+  try {
+    const actor = requireActor(req, res);
+    if (!actor) {
+      return;
+    }
+
+    const fromOwnerUserId = String(req.params.ownerUserId || "").trim();
+    const toOwnerUserId = String(req.body?.toOwnerUserId || "").trim();
+
+    if (!fromOwnerUserId) {
+      return res.status(400).json({ message: "ownerUserId is required." });
+    }
+    if (!toOwnerUserId) {
+      return res.status(400).json({ message: "toOwnerUserId is required." });
+    }
+    if (fromOwnerUserId === toOwnerUserId) {
+      return res.status(200).json({
+        message: "Owner documents already belong to the target user.",
+        fromOwnerUserId,
+        toOwnerUserId,
+        migratedDocuments: 0,
+        migratedAccountingRecords: 0,
+        migratedStorageObjects: 0
+      });
+    }
+
+    if (!isAdminActor(actor)) {
+      return res.status(403).json({
+        message: "Only admin users can reassign owner documents."
+      });
+    }
+    if (
+      !assertAdminDocumentPermission(
+        res,
+        actor,
+        ["delete_data"],
+        "You do not have permission to reassign owner documents."
+      )
+    ) {
+      return;
+    }
+
+    const [documentsResult, accountingResult] = await Promise.all([
+      reassignDocumentsForOwner({
+        fromOwnerUserId,
+        toOwnerUserId
+      }),
+      reassignRecordsByOwner({
+        fromOwnerUserId,
+        toOwnerUserId
+      })
+    ]);
+
+    return res.status(200).json({
+      message: "Owner documents reassigned successfully.",
+      fromOwnerUserId,
+      toOwnerUserId,
+      migratedDocuments: Number(documentsResult?.migratedDocuments || 0),
+      migratedAccountingRecords: Number(accountingResult?.modifiedCount || 0),
+      migratedStorageObjects: Number(documentsResult?.migratedStorageObjects || 0)
     });
   } catch (error) {
     return next(error);
@@ -392,6 +537,18 @@ export const getDownloadUrl = async (req, res, next) => {
     if (!actorIsPrivileged && document.ownerUserId !== actor.uid) {
       return res.status(403).json({ message: "You cannot download this document." });
     }
+    if (
+      actorIsPrivileged
+      && document.ownerUserId !== actor.uid
+      && !assertAdminDocumentPermission(
+        res,
+        actor,
+        ["download_documents"],
+        "You do not have permission to download another user's document."
+      )
+    ) {
+      return;
+    }
 
     if (document.storageProvider !== "mongodb" || !document.storagePath) {
       return res.status(400).json({
@@ -429,6 +586,18 @@ export const downloadById = async (req, res, next) => {
     const actorIsPrivileged = isPrivilegedActor(actor);
     if (!actorIsPrivileged && document.ownerUserId !== actor.uid) {
       return res.status(403).json({ message: "You cannot download this document." });
+    }
+    if (
+      actorIsPrivileged
+      && document.ownerUserId !== actor.uid
+      && !assertAdminDocumentPermission(
+        res,
+        actor,
+        ["download_documents"],
+        "You do not have permission to download another user's document."
+      )
+    ) {
+      return;
     }
 
     if (document.storageProvider !== "mongodb" || !document.storagePath) {

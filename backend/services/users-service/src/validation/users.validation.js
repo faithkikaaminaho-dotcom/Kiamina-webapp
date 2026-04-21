@@ -1,4 +1,8 @@
 import Joi from "joi";
+import {
+  normalizeAdminLevel,
+  sanitizeAdminPermissions
+} from "../utils/admin-access.js";
 
 const USER_STATUS_VALUES = ["active", "disabled", "suspended"];
 const USER_ROLE_VALUES = [
@@ -42,6 +46,7 @@ const CLIENT_MANAGEMENT_SORT_FIELDS = [
   "status",
   "verificationStatus"
 ];
+const CLIENT_TEAM_ROLE_VALUES = ["owner", "manager", "accountant", "viewer"];
 
 const CAC_PREFIX_REGEX = /^(RC|BN|IT|LP|LLP)/i;
 
@@ -85,6 +90,7 @@ const DASHBOARD_PAGE_SCHEMA = Joi.string().valid(...DASHBOARD_PAGE_IDS);
 const ADMIN_DASHBOARD_PAGE_SCHEMA = Joi.string().valid(...ADMIN_DASHBOARD_PAGE_IDS);
 const LANGUAGE_SCHEMA = Joi.string().valid(...LANGUAGE_VALUES);
 const CLIENT_MANAGEMENT_SORT_FIELD_SCHEMA = Joi.string().valid(...CLIENT_MANAGEMENT_SORT_FIELDS);
+const CLIENT_TEAM_ROLE_SCHEMA = Joi.string().trim().lowercase().valid(...CLIENT_TEAM_ROLE_VALUES);
 const LETTERS_ONLY_NAME_SCHEMA = Joi.string().pattern(/^[A-Za-z\s]+$/);
 const PHONE_COUNTRY_CODE_SCHEMA = Joi.string().pattern(/^\+\d{1,4}$/);
 const ISO_CURRENCY_SCHEMA = Joi.string().pattern(/^[A-Z]{3}$/);
@@ -278,6 +284,8 @@ const NEWSLETTER_INPUT_SCHEMA = Joi.object({
   lastEngagedAt: Joi.date().iso().allow(null).optional()
 });
 
+const ADMIN_DASHBOARD_GENERIC_ENTRY_SCHEMA = Joi.object().unknown(true);
+
 const parseDashboardCollection = ({
   source,
   key,
@@ -310,6 +318,42 @@ const parseDashboardCollection = ({
   });
 
   return hasItemErrors ? null : values;
+};
+
+const parseGenericDashboardObjectCollection = ({
+  source,
+  key,
+  targetPath,
+  invalidTypeMessage,
+  invalidItemMessage,
+  errors,
+  payload
+}) => {
+  if (source[key] === undefined) {
+    return;
+  }
+
+  if (!Array.isArray(source[key])) {
+    errors.push(invalidTypeMessage);
+    return;
+  }
+
+  const values = [];
+  let hasItemErrors = false;
+  source[key].forEach((item, index) => {
+    const { value, error } = ADMIN_DASHBOARD_GENERIC_ENTRY_SCHEMA.validate(item ?? {}, VALIDATION_OPTIONS);
+    if (error) {
+      errors.push(`${invalidItemMessage} at index ${index}`);
+      hasItemErrors = true;
+      return;
+    }
+
+    values.push(value && typeof value === "object" ? { ...value } : value);
+  });
+
+  if (!hasItemErrors) {
+    payload[targetPath] = values;
+  }
 };
 
 export const validateSyncFromAuthPayload = (body) => {
@@ -1152,12 +1196,11 @@ export const buildAdminStaffUpdatePayload = (body) => {
       if (error) {
         errors.push("adminAccess contains invalid values");
       } else {
-        payload["adminAccess.adminLevel"] = value.adminLevel;
-        payload["adminAccess.adminPermissions"] = [
-          ...new Set((Array.isArray(value.adminPermissions) ? value.adminPermissions : [])
-            .map((permission) => normalizeString(permission))
-            .filter(Boolean))
-        ];
+        const normalizedAdminLevel = normalizeString(value.adminLevel);
+        payload["adminAccess.adminLevel"] = normalizedAdminLevel
+          ? normalizeAdminLevel(normalizedAdminLevel)
+          : "";
+        payload["adminAccess.adminPermissions"] = sanitizeAdminPermissions(value.adminPermissions);
         payload["adminAccess.mustChangePassword"] = Boolean(value.mustChangePassword);
       }
     }
@@ -1319,5 +1362,150 @@ export const buildAdminDashboardUpdatePayload = (body) => {
     ).length;
   }
 
+  parseGenericDashboardObjectCollection({
+    source,
+    key: "workSessions",
+    targetPath: "adminDashboard.workSessions",
+    invalidTypeMessage: "workSessions must be an array of objects",
+    invalidItemMessage: "workSessions contains invalid value",
+    errors,
+    payload
+  });
+
+  parseGenericDashboardObjectCollection({
+    source,
+    key: "sentNotifications",
+    targetPath: "adminDashboard.sentNotifications",
+    invalidTypeMessage: "sentNotifications must be an array of objects",
+    invalidItemMessage: "sentNotifications contains invalid value",
+    errors,
+    payload
+  });
+
+  parseGenericDashboardObjectCollection({
+    source,
+    key: "notificationDrafts",
+    targetPath: "adminDashboard.notificationDrafts",
+    invalidTypeMessage: "notificationDrafts must be an array of objects",
+    invalidItemMessage: "notificationDrafts contains invalid value",
+    errors,
+    payload
+  });
+
+  parseGenericDashboardObjectCollection({
+    source,
+    key: "scheduledNotifications",
+    targetPath: "adminDashboard.scheduledNotifications",
+    invalidTypeMessage: "scheduledNotifications must be an array of objects",
+    invalidItemMessage: "scheduledNotifications contains invalid value",
+    errors,
+    payload
+  });
+
+  parseGenericDashboardObjectCollection({
+    source,
+    key: "trashEntries",
+    targetPath: "adminDashboard.trashEntries",
+    invalidTypeMessage: "trashEntries must be an array of objects",
+    invalidItemMessage: "trashEntries contains invalid value",
+    errors,
+    payload
+  });
+
   return { payload, errors };
+};
+
+export const buildClientTeamInviteCreatePayload = (body) => {
+  const source = normalizeSource(body);
+  const errors = [];
+  const email = normalizeString(source.email).toLowerCase();
+  const role = normalizeString(source.role).toLowerCase() || "manager";
+  const inviteBaseUrl = normalizeString(source.inviteBaseUrl);
+
+  if (EMAIL_SCHEMA.validate(email).error) {
+    errors.push("email must be a valid email address");
+  }
+
+  if (CLIENT_TEAM_ROLE_SCHEMA.validate(role).error || role === "owner") {
+    errors.push("role must be one of: manager, accountant, viewer");
+  }
+
+  if (inviteBaseUrl && Joi.string().uri({ allowRelative: false }).validate(inviteBaseUrl).error) {
+    errors.push("inviteBaseUrl must be a valid absolute URL");
+  }
+
+  return {
+    payload: {
+      email,
+      role,
+      inviteBaseUrl
+    },
+    errors
+  };
+};
+
+export const validatePublicClientTeamInviteQuery = (query) => {
+  const source = normalizeSource(query);
+  const invite = normalizeString(source.invite || source.token);
+  const companyId = normalizeString(source.company || source.companyId);
+  const errors = [];
+
+  if (!invite) {
+    errors.push("invite is required");
+  }
+  if (!companyId) {
+    errors.push("company is required");
+  }
+
+  return {
+    payload: {
+      invite,
+      companyId
+    },
+    errors
+  };
+};
+
+export const buildClientTeamInviteAcceptPayload = (body) => {
+  const source = normalizeSource(body);
+  const payload = {
+    token: normalizeString(source.token || source.invite),
+    companyId: normalizeString(source.companyId || source.company),
+    email: normalizeString(source.email).toLowerCase(),
+    fullName: normalizeString(source.fullName)
+  };
+  const errors = [];
+
+  if (!payload.token) {
+    errors.push("token is required");
+  }
+  if (!payload.companyId) {
+    errors.push("companyId is required");
+  }
+  if (!payload.email) {
+    errors.push("email is required");
+  } else if (EMAIL_SCHEMA.validate(payload.email).error) {
+    errors.push("email must be a valid email address");
+  }
+
+  return { payload, errors };
+};
+
+export const buildClientTeamMemberUpdatePayload = (body) => {
+  const source = normalizeSource(body);
+  const role = normalizeString(source.role).toLowerCase();
+  const errors = [];
+
+  if (!role) {
+    errors.push("role is required");
+  } else if (CLIENT_TEAM_ROLE_SCHEMA.validate(role).error || role === "owner") {
+    errors.push("role must be one of: manager, accountant, viewer");
+  }
+
+  return {
+    payload: {
+      role
+    },
+    errors
+  };
 };

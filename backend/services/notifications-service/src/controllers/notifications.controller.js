@@ -6,7 +6,11 @@ import {
   updateNotificationStatus
 } from "../services/notifications.service.js";
 import { publishRealtimeEvent } from "../services/realtime-events.service.js";
-import { getRequestActor, isAdminActor } from "../utils/request-actor.js";
+import {
+  getRequestActor,
+  hasAnyAdminPermission,
+  isAdminActor
+} from "../utils/request-actor.js";
 import {
   buildNotificationLogUpdatePayload,
   validatePatchStatusPayload,
@@ -39,6 +43,22 @@ const requireAdminActor = (req, res) => {
   return actor;
 };
 
+const requireAdminPermission = (req, res, permissionIds = [], message) => {
+  const actor = requireAdminActor(req, res);
+  if (!actor) {
+    return null;
+  }
+
+  if (!hasAnyAdminPermission(actor, permissionIds)) {
+    res.status(403).json({
+      message: message || "You do not have permission to perform this action."
+    });
+    return null;
+  }
+
+  return actor;
+};
+
 const emitNotificationEvent = (eventPayload = {}) => {
   try {
     publishRealtimeEvent(eventPayload);
@@ -49,7 +69,12 @@ const emitNotificationEvent = (eventPayload = {}) => {
 
 export const sendEmail = async (req, res, next) => {
   try {
-    const actor = requireAdminActor(req, res);
+    const actor = requireAdminPermission(
+      req,
+      res,
+      ["send_notifications"],
+      "You do not have permission to send notifications."
+    );
     if (!actor) {
       return;
     }
@@ -92,7 +117,12 @@ export const sendEmail = async (req, res, next) => {
 
 export const listLogs = async (req, res, next) => {
   try {
-    const actor = requireAdminActor(req, res);
+    const actor = requireAdminPermission(
+      req,
+      res,
+      ["send_notifications"],
+      "You do not have permission to view notification logs."
+    );
     if (!actor) {
       return;
     }
@@ -107,7 +137,12 @@ export const listLogs = async (req, res, next) => {
 
 export const patchLogStatus = async (req, res, next) => {
   try {
-    const actor = requireAdminActor(req, res);
+    const actor = requireAdminPermission(
+      req,
+      res,
+      ["send_notifications"],
+      "You do not have permission to update notification logs."
+    );
     if (!actor) {
       return;
     }
@@ -152,7 +187,12 @@ export const patchLogStatus = async (req, res, next) => {
 
 export const putLog = async (req, res, next) => {
   try {
-    const actor = requireAdminActor(req, res);
+    const actor = requireAdminPermission(
+      req,
+      res,
+      ["send_notifications"],
+      "You do not have permission to update notification logs."
+    );
     if (!actor) {
       return;
     }
@@ -203,7 +243,12 @@ export const putLog = async (req, res, next) => {
 
 export const deleteLog = async (req, res, next) => {
   try {
-    const actor = requireAdminActor(req, res);
+    const actor = requireAdminPermission(
+      req,
+      res,
+      ["send_notifications"],
+      "You do not have permission to delete notification logs."
+    );
     if (!actor) {
       return;
     }

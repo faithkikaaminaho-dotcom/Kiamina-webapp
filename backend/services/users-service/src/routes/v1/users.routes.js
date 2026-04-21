@@ -1,10 +1,13 @@
 import express from "express";
 import {
+  deleteMeClientTeamMember,
   deleteAdminClientManagementClient,
   getAdminClientManagement,
   getAdminClientManagementClient,
   getAdminStaff,
+  getMeClientTeam,
   postPublicNewsletter,
+  getPublicClientTeamInviteByToken,
   postPublicSupportLead,
   getPublicPhoneAvailability,
   getMeAdminDashboard,
@@ -13,7 +16,11 @@ import {
   getMeClientWorkspace,
   getById,
   getMe,
+  patchMeClientTeamInvite,
+  patchMeClientTeamMember,
   patchAdminStaffByUid,
+  postMeClientTeamInvite,
+  postMeClientTeamInviteAccept,
   removeMe,
   patchAdminClientManagementClient,
   patchMeAdminDashboard,
@@ -30,6 +37,7 @@ const router = express.Router();
 router.get("/public/phone-availability", getPublicPhoneAvailability);
 router.post("/public/support-leads", postPublicSupportLead);
 router.post("/public/newsletters", postPublicNewsletter);
+router.get("/public/client-team-invite", getPublicClientTeamInviteByToken);
 router.post("/sync-from-auth", syncFromAuth);
 router.get("/me", getMe);
 router.delete("/me", removeMe);
@@ -39,6 +47,12 @@ router.get("/me/client-dashboard/overview", getMeClientDashboardOverview);
 router.patch("/me/client-dashboard", patchMeClientDashboard);
 router.get("/me/client-workspace", getMeClientWorkspace);
 router.patch("/me/client-workspace", patchMeClientWorkspace);
+router.get("/me/client-team", getMeClientTeam);
+router.post("/me/client-team/invites", postMeClientTeamInvite);
+router.post("/me/client-team/invites/accept", postMeClientTeamInviteAccept);
+router.patch("/me/client-team/invites/:inviteId", patchMeClientTeamInvite);
+router.patch("/me/client-team/members/:memberId", patchMeClientTeamMember);
+router.delete("/me/client-team/members/:memberId", deleteMeClientTeamMember);
 router.get("/me/admin-dashboard", getMeAdminDashboard);
 router.patch("/me/admin-dashboard", patchMeAdminDashboard);
 router.get("/admin/staff", getAdminStaff);

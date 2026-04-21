@@ -32,6 +32,17 @@ export const findUserByUid = async (uid) => User.findOne({ uid });
 export const findUserByEmail = async (email) =>
   User.findOne({ email: String(email || "").trim().toLowerCase() });
 
+export const findUserByClientTeamInvite = async ({ token = "" } = {}) => {
+  const normalizedToken = String(token || "").trim();
+  if (!normalizedToken) {
+    return null;
+  }
+
+  return User.findOne({
+    "clientWorkspace.teamInvites.token": normalizedToken
+  });
+};
+
 export const findUserByClientPhone = async ({
   excludeUid = "",
   phoneCountryCode = "",

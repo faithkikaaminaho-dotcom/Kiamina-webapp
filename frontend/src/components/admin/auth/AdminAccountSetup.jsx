@@ -175,14 +175,6 @@ function AdminAccountSetup({
   const submitSetup = async (event) => {
     event.preventDefault()
     if (!hasInviteToken && !isOwnerBootstrapMode) return
-    if (!isOwnerInvite && identityVerificationState.status !== 'verified') {
-      setErrorMessage('Submit identity verification before creating account.')
-      return
-    }
-    if (!isOwnerInvite && !setupForm.residentialAddress.trim()) {
-      setErrorMessage('Residential address is required for this admin role.')
-      return
-    }
     if (isOwnerInvite) {
       if (!setupForm.ownerPrivateKey.trim() || !setupForm.confirmOwnerPrivateKey.trim()) {
         setErrorMessage('Owner private key and confirmation are required.')
@@ -207,7 +199,7 @@ function AdminAccountSetup({
       workCountry: normalizedWorkCountry,
       governmentIdType: setupForm.governmentIdType,
       governmentIdNumber: setupForm.governmentIdNumber,
-      identityVerificationPassed: identityVerificationState.status === 'verified',
+      identityVerificationPassed: true,
       residentialAddress: setupForm.residentialAddress,
       ownerPrivateKey: setupForm.ownerPrivateKey,
       confirmOwnerPrivateKey: setupForm.confirmOwnerPrivateKey,
@@ -630,8 +622,11 @@ function AdminAccountSetup({
                   className="h-10 px-4 border border-primary text-primary rounded-md text-sm font-semibold hover:bg-primary-tint transition-colors disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
                 >
                   {isIdentityVerifying && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {isIdentityVerifying ? 'Identifying...' : 'Submit for Verification'}
+                  {isIdentityVerifying ? 'Checking...' : 'Optional Identity Check'}
                 </button>
+                <p className="text-xs text-text-muted mt-2">
+                  Verification is optional in the MVP. You can continue without completing this step.
+                </p>
                 {identityVerificationState.message && (
                   <p className={`text-xs mt-2 ${
                     identityVerificationState.status === 'verified'
@@ -650,13 +645,13 @@ function AdminAccountSetup({
           {isOwnerInvite && (
             <div className="rounded-md border border-border-light bg-[#FAFBFF] px-3 py-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Owner Verification</p>
-              <p className="text-sm text-text-secondary mt-1">Owner role does not require government ID verification.</p>
+              <p className="text-sm text-text-secondary mt-1">Government ID verification is optional in the MVP.</p>
             </div>
           )}
 
           <div>
             <label className="block text-sm font-medium text-text-primary mb-1.5">
-              Residential Address {isOwnerInvite ? '(Optional)' : ''}
+              Residential Address (Optional)
             </label>
             <input
               type="text"

@@ -6,6 +6,7 @@ import {
   findAuthAccountByEmail,
   findAuthAccountByUid,
   listAuthAccounts,
+  updateAuthAccountByUid,
   updateAuthAccountLoginMeta,
   upsertAuthAccountByUid
 } from "../repositories/auth-accounts.repository.js";
@@ -71,6 +72,75 @@ const generateLocalUid = () => `local_${crypto.randomUUID().replace(/-/g, "")}`;
 
 const generateSessionId = () => crypto.randomUUID().replace(/-/g, "");
 
+const buildAuthAccountPayload = ({
+  existing = null,
+  uid,
+  email,
+  fullName,
+  role,
+  provider,
+  status,
+  emailVerified,
+  phoneVerified
+}) => ({
+  uid,
+  email,
+  fullName: fullName || existing?.fullName || "",
+  role: role || existing?.role || "client",
+  provider: provider || existing?.provider || "email-password",
+  status: status || existing?.status || "active",
+  emailVerified:
+    typeof emailVerified === "boolean"
+      ? emailVerified
+      : Boolean(existing?.emailVerified),
+  phoneVerified:
+    typeof phoneVerified === "boolean"
+      ? phoneVerified
+      : Boolean(existing?.phoneVerified),
+  onboardingStartedAt: existing?.onboardingStartedAt || new Date()
+});
+
+const migrateAuthAccountUid = async ({
+  account,
+  nextUid,
+  email,
+  fullName,
+  role,
+  provider,
+  status,
+  emailVerified,
+  phoneVerified
+}) => {
+  if (!account) {
+    return null;
+  }
+
+  const normalizedNextUid = String(nextUid || "").trim();
+  if (!normalizedNextUid || normalizedNextUid === account.uid) {
+    return account;
+  }
+
+  await revokeAuthSessionsByUid({
+    uid: account.uid,
+    reason: "uid-migrated"
+  });
+
+  return updateAuthAccountByUid({
+    uid: account.uid,
+    payload: buildAuthAccountPayload({
+      existing: account,
+      uid: normalizedNextUid,
+      email,
+      fullName,
+      role,
+      provider,
+      status,
+      emailVerified,
+      phoneVerified
+    })
+  });
+};
+
 export const getOwnerBootstrapEligibility = async () => {
   const adminAccountCount = await countAuthAccountsByRoles([
     "admin",
@@ -119,27 +189,40 @@ export const registerOrUpdateAuthAccount = async ({
   }
 
   if (!existingByUid && uid && existingByEmail && existingByEmail.uid !== uid) {
-    throw createConflictError("The supplied email already belongs to another account.");
+    const migratedAccount = await migrateAuthAccountUid({
+      account: existingByEmail,
+      nextUid: uid,
+      email: normalizedEmail,
+      fullName,
+      role,
+      provider,
+      status,
+      emailVerified,
+      phoneVerified
+    });
+
+    return {
+      account: migratedAccount,
+      created: false
+    };
   }
 
   const existing = existingByUid || existingByEmail;
-
   const resolvedUid = existing?.uid || uid || generateLocalUid();
-  const now = new Date();
 
   const account = await upsertAuthAccountByUid({
     uid: resolvedUid,
-    payload: {
+    payload: buildAuthAccountPayload({
+      existing,
       uid: resolvedUid,
       email: normalizedEmail,
-      fullName: fullName || existing?.fullName || "",
-      role: role || existing?.role || "client",
-      provider: provider || existing?.provider || "email-password",
-      status: status || existing?.status || "active",
-      emailVerified: typeof emailVerified === "boolean" ? emailVerified : Boolean(existing?.emailVerified),
-      phoneVerified: typeof phoneVerified === "boolean" ? phoneVerified : Boolean(existing?.phoneVerified),
-      onboardingStartedAt: existing?.onboardingStartedAt || now
-    }
+      fullName,
+      role,
+      provider,
+      status,
+      emailVerified,
+      phoneVerified
+    })
   });
 
   return {
@@ -167,23 +250,29 @@ export const createLoginSessionRecord = async ({
     account = await findAuthAccountByEmail(normalizedEmail);
   }
 
-  if (!account) {
-    if (!normalizedEmail) {
-      throw createNotFoundError("No account found for the supplied uid/email.");
-    }
-
-    const created = await registerOrUpdateAuthAccount({
+  if (normalizedEmail) {
+    const syncedAccount = await registerOrUpdateAuthAccount({
       uid,
       email: normalizedEmail,
-      fullName: "",
-      role: role || "client",
-      provider: "email-password",
-      status: "active",
-      emailVerified: false,
-      phoneVerified: false
+      fullName: account?.fullName || "",
+      role: account?.role || role || "client",
+      provider: account?.provider || "email-password",
+      status: account?.status || "active",
+      emailVerified:
+        typeof account?.emailVerified === "boolean"
+          ? account.emailVerified
+          : false,
+      phoneVerified:
+        typeof account?.phoneVerified === "boolean"
+          ? account.phoneVerified
+          : false
     });
 
-    account = created.account;
+    account = syncedAccount.account;
+  }
+
+  if (!account) {
+    throw createNotFoundError("No account found for the supplied uid/email.");
   }
 
   if (account.status !== "active") {

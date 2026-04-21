@@ -19,6 +19,18 @@ export const upsertAuthAccountByUid = async ({ uid, payload }) =>
     }
   );
 
+export const updateAuthAccountByUid = async ({ uid, payload }) =>
+  AuthAccount.findOneAndUpdate(
+    { uid },
+    {
+      $set: payload
+    },
+    {
+      new: true,
+      runValidators: true
+    }
+  );
+
 export const updateAuthAccountLoginMeta = async ({
   uid,
   lastLoginAt,

@@ -12,7 +12,15 @@ let setupError = null;
 const adminHeaders = {
   "x-user-id": "admin_uid_1",
   "x-user-email": "admin@example.com",
-  "x-user-roles": "admin"
+  "x-user-roles": "admin",
+  "x-user-admin-permissions": "client_assistance,send_notifications"
+};
+
+const limitedAdminHeaders = {
+  "x-user-id": "admin_uid_2",
+  "x-user-email": "limited-admin@example.com",
+  "x-user-roles": "admin",
+  "x-user-admin-permissions": "client_assistance"
 };
 
 const userHeaders = {
@@ -93,6 +101,34 @@ test("notifications integration: knowledge-base create and search", async (t) =>
   assert.equal(searchResponse.status, 200);
   assert.ok(Array.isArray(searchResponse.body));
   assert.ok(searchResponse.body.length >= 1);
+});
+
+test("notifications integration: send-email requires send_notifications permission", async (t) => {
+  if (!ensureSetup(t)) return;
+
+  const deniedResponse = await request(app)
+    .post("/api/v1/notifications/send-email")
+    .set(limitedAdminHeaders)
+    .send({
+      to: ["client@example.com"],
+      subject: "Permission test",
+      message: "This should be denied."
+    });
+
+  assert.equal(deniedResponse.status, 403);
+  assert.match(deniedResponse.body?.message || "", /send notifications/i);
+
+  const allowedResponse = await request(app)
+    .post("/api/v1/notifications/send-email")
+    .set(adminHeaders)
+    .send({
+      to: ["client@example.com"],
+      subject: "Permission test",
+      message: "This should be queued."
+    });
+
+  assert.equal(allowedResponse.status, 503);
+  assert.match(allowedResponse.body?.message || "", /qstash not configured|provider/i);
 });
 
 test("notifications integration: chatbot session message and escalation to support", async (t) => {

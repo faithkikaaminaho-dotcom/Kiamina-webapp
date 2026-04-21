@@ -1,4 +1,5 @@
 import { Document } from "../models/Document.model.js";
+import { StoredDocumentAsset } from "../models/StoredDocumentAsset.model.js";
 
 export const createDocumentRecord = async (payload) => Document.create(payload);
 
@@ -29,6 +30,32 @@ export const deleteDocumentById = async (id) => Document.findByIdAndDelete(id);
 
 export const deleteDocumentsByOwner = async (ownerUserId) =>
   Document.deleteMany({ ownerUserId });
+
+export const reassignDocumentsByOwner = async ({
+  fromOwnerUserId,
+  toOwnerUserId
+}) =>
+  Document.updateMany(
+    { ownerUserId: String(fromOwnerUserId || "").trim() },
+    {
+      $set: {
+        ownerUserId: String(toOwnerUserId || "").trim()
+      }
+    }
+  );
+
+export const reassignStoredAssetsByOwner = async ({
+  fromOwnerUserId,
+  toOwnerUserId
+}) =>
+  StoredDocumentAsset.updateMany(
+    { ownerUserId: String(fromOwnerUserId || "").trim() },
+    {
+      $set: {
+        ownerUserId: String(toOwnerUserId || "").trim()
+      }
+    }
+  );
 
 const getSafeStatusKey = (value = "") => {
   const normalized = String(value || "").trim().toLowerCase();

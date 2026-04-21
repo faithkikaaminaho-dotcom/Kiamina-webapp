@@ -1,4 +1,7 @@
 import { env } from "../config/env.js";
+import { buildAdminAccessContext } from "../utils/admin-access.js";
+
+const ADMIN_ROLES = new Set(["admin", "owner", "superadmin"]);
 
 const PUBLIC_ROUTE_KEYS = new Set([
   "GET /gateway/info",
@@ -10,6 +13,7 @@ const PUBLIC_ROUTE_KEYS = new Set([
   "GET /users/public/phone-availability",
   "POST /users/public/support-leads",
   "POST /users/public/newsletters",
+  "GET /users/public/client-team-invite",
   "GET /auth/bootstrap-owner-status",
   "POST /auth/authenticate-password",
   "POST /auth/register-account",
@@ -118,6 +122,11 @@ const normalizeRoles = (rolesValue) => {
   return [];
 };
 
+const shouldLoadAdminAccess = (roles = []) =>
+  (Array.isArray(roles) ? roles : []).some((role) =>
+    ADMIN_ROLES.has(String(role || "").trim().toLowerCase())
+  );
+
 const verifyTokenWithAuthService = async ({
   idToken,
   accessToken,
@@ -141,6 +150,46 @@ const verifyTokenWithAuthService = async ({
     });
 
     return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+const fetchUserProfileFromUsersService = async ({
+  identity,
+  requestId
+}) => {
+  if (!identity?.uid || !env.usersServiceUrl) {
+    return null;
+  }
+
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => {
+    abortController.abort();
+  }, env.authVerifyTimeoutMs);
+
+  try {
+    const response = await fetch(`${env.usersServiceUrl}/api/v1/users/me`, {
+      method: "GET",
+      headers: {
+        ...(requestId ? { "x-request-id": requestId } : {}),
+        "x-user-id": identity.uid,
+        "x-user-email": identity.email || "",
+        "x-user-roles": (Array.isArray(identity.roles) ? identity.roles : []).join(",")
+      },
+      signal: abortController.signal
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return await response.json().catch(() => null);
+  } catch (error) {
+    if (error?.name !== "AbortError") {
+      console.warn("auth-guard admin access enrichment warning:", error.message);
+    }
+    return null;
   } finally {
     clearTimeout(timeoutId);
   }
@@ -199,12 +248,41 @@ export const authGuardMiddleware = async (req, res, next) => {
       });
     }
 
+    const normalizedRoles = normalizeRoles(identity.roles);
+    let adminLevel = "";
+    let adminPermissions = [];
+
+    if (shouldLoadAdminAccess(normalizedRoles)) {
+      const userProfile = await fetchUserProfileFromUsersService({
+        identity: {
+          uid: identity.uid,
+          email: identity.email || "",
+          roles: normalizedRoles
+        },
+        requestId: req.id
+      });
+      const adminContext = buildAdminAccessContext({
+        identity: {
+          uid: identity.uid,
+          email: identity.email || "",
+          roles: normalizedRoles
+        },
+        user: userProfile
+      });
+      adminLevel = adminContext.adminLevel || "";
+      adminPermissions = Array.isArray(adminContext.adminPermissions)
+        ? adminContext.adminPermissions
+        : [];
+    }
+
     req.user = {
       uid: identity.uid,
       email: identity.email || "",
       emailVerified: Boolean(identity.emailVerified),
       sessionId: identity.sessionId || sessionId || "",
-      roles: normalizeRoles(identity.roles)
+      roles: normalizedRoles,
+      adminLevel,
+      adminPermissions
     };
 
     return next();

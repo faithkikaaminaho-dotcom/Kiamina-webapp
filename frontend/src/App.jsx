@@ -55,6 +55,10 @@ import {
   subscribeToRealtimeEvents,
 } from './utils/clientBackendBridge'
 import {
+  acceptClientTeamInvite as acceptClientTeamInviteFromBackend,
+  fetchPublicClientTeamInvite,
+} from './utils/clientTeamApi'
+import {
   applyEmailVerificationCode,
   clearFirebaseAuthSession,
   completePasswordResetWithCode,
@@ -121,6 +125,9 @@ const CLIENT_SESSION_CONTROL_STORAGE_KEY = 'kiaminaClientSessionControl'
 const CLIENT_BRIEF_NOTIFICATIONS_STORAGE_KEY = 'kiaminaClientBriefNotifications'
 const CLIENT_SETTINGS_REDIRECT_SECTION_KEY = 'kiaminaClientSettingsRedirectSection'
 const CLIENT_ASSIGNMENTS_STORAGE_KEY = 'kiaminaClientAssignments'
+const CLIENT_TEAM_INVITES_STORAGE_KEY = 'clientTeamInvites'
+const CLIENT_TEAM_MEMBERS_STORAGE_KEY = 'clientTeamMembers'
+const CLIENT_TEAM_ACCESS_STORAGE_KEY = 'kiaminaClientTeamAccess'
 const IMPERSONATION_IDLE_TIMEOUT_MS = 10 * 60 * 1000
 const ADMIN_GOV_ID_TYPES_NIGERIA = ['International Passport', 'NIN', "Voter's Card", "Driver's Licence"]
 const ADMIN_GOV_ID_TYPE_INTERNATIONAL = 'Government Issued ID'
@@ -1425,6 +1432,96 @@ const normalizeSettingsProfile = (payload = {}) => {
   }
 }
 
+const TEAM_AFFILIATION_BUSINESS_FIELDS = Object.freeze([
+  'businessType',
+  'businessName',
+  'country',
+  'currency',
+  'industry',
+  'industryOther',
+  'cacNumber',
+  'tin',
+  'reportingCycle',
+  'startMonth',
+])
+
+const hasMeaningfulValue = (value) => {
+  if (typeof value === 'string') return value.trim().length > 0
+  return value !== null && value !== undefined && value !== ''
+}
+
+const buildClientTeamAffiliationState = ({
+  authUser = null,
+  settingsProfile = {},
+  onboardingData = {},
+  companyName = '',
+} = {}) => {
+  const normalizedRole = normalizeClientTeamRole(authUser?.clientTeamRole || '')
+  const ownerEmail = String(authUser?.clientTeamOwnerEmail || '').trim().toLowerCase()
+  const ownerName = String(authUser?.clientTeamOwnerName || '').trim()
+  const isTeamMember = normalizedRole !== 'owner' && Boolean(ownerEmail || ownerName)
+  if (!isTeamMember) return null
+
+  const normalizedSettingsProfile = normalizeSettingsProfile(settingsProfile || {})
+  const normalizedOnboardingData = onboardingData && typeof onboardingData === 'object' ? onboardingData : {}
+
+  return {
+    isTeamMember: true,
+    role: normalizedRole || 'viewer',
+    companyId: String(authUser?.clientTeamCompanyId || '').trim(),
+    ownerEmail,
+    ownerName,
+    accountType: String(authUser?.clientAccountType || '').trim() || 'team-member',
+    companyName: String(
+      authUser?.clientTeamCompanyName
+      || normalizedSettingsProfile.businessName
+      || normalizedOnboardingData.businessName
+      || companyName
+      || ''
+    ).trim(),
+    businessType: String(
+      authUser?.clientTeamBusinessType
+      || normalizedSettingsProfile.businessType
+      || normalizedOnboardingData.businessType
+      || ''
+    ).trim(),
+    country: String(
+      authUser?.clientTeamCountry
+      || normalizedSettingsProfile.country
+      || normalizedOnboardingData.country
+      || ''
+    ).trim(),
+    currency: String(
+      authUser?.clientTeamCurrency
+      || normalizedSettingsProfile.currency
+      || normalizedOnboardingData.currency
+      || 'NGN'
+    ).trim(),
+    industry: String(normalizedSettingsProfile.industry || normalizedOnboardingData.industry || '').trim(),
+    industryOther: String(normalizedSettingsProfile.industryOther || normalizedOnboardingData.industryOther || '').trim(),
+    cacNumber: String(normalizedSettingsProfile.cacNumber || normalizedOnboardingData.cacNumber || '').trim(),
+    tin: String(normalizedSettingsProfile.tin || normalizedOnboardingData.tin || '').trim(),
+    reportingCycle: String(normalizedSettingsProfile.reportingCycle || normalizedOnboardingData.reportingCycle || '').trim(),
+    startMonth: String(normalizedSettingsProfile.startMonth || normalizedOnboardingData.startMonth || '').trim(),
+  }
+}
+
+const applyTeamAffiliationBusinessFields = ({
+  data = {},
+  affiliation = null,
+} = {}) => {
+  const source = data && typeof data === 'object' ? data : {}
+  if (!affiliation?.isTeamMember) return source
+
+  const next = { ...source }
+  TEAM_AFFILIATION_BUSINESS_FIELDS.forEach((field) => {
+    if (!hasMeaningfulValue(next[field]) && hasMeaningfulValue(affiliation[field])) {
+      next[field] = affiliation[field]
+    }
+  })
+  return next
+}
+
 const sanitizeProfileNameFieldForBackend = (value = '') => (
   String(value || '')
     .replace(/[^A-Za-z\s]/g, ' ')
@@ -1553,6 +1650,7 @@ const resolveCapturePageFromPath = (pathname = '/') => {
   if (normalizedPath === '/signup') return 'signup'
   if (normalizedPath === '/admin/login') return 'admin-login'
   if (normalizedPath === '/admin/setup') return 'admin-setup'
+  if (normalizedPath === '/team/setup') return 'team-setup'
   return normalizedPath.replace(/^\//, '') || 'home'
 }
 
@@ -1889,12 +1987,8 @@ const resolveVerificationProgress = ({
     && normalizedSettingsProfile.phone
     && normalizedSettingsProfile.address,
   )
-  const normalizedBusinessType = String(
-    normalizedSettingsProfile.businessType || onboardingData?.businessType || '',
-  ).trim().toLowerCase()
-  const isIndividualBusinessType = normalizedBusinessType === 'individual'
-  // const identityStepCompleted = Boolean(mergedDocs.govId && mergedDocs.govIdType && mergedDocs.govIdNumber && mergedDocs.govIdVerifiedAt)
-  const businessStepCompleted = isIndividualBusinessType || Boolean(mergedDocs.businessReg)
+  // Business verification is disabled for the MVP, so this retired step stays satisfied.
+  const businessStepCompleted = true
   return {
     profile: normalizedSettingsProfile,
     docs: mergedDocs,
@@ -2028,12 +2122,339 @@ function App() {
     const invites = getSavedAdminInvites()
     return invites.find((invite) => invite.token === normalizedToken) || null
   }
+  const normalizeClientTeamRole = (value = '') => {
+    const normalized = String(value || '').trim().toLowerCase()
+    if (normalized === 'owner') return 'owner'
+    if (normalized === 'manager') return 'manager'
+    if (normalized === 'accountant') return 'accountant'
+    if (normalized === 'viewer') return 'viewer'
+    return 'viewer'
+  }
+  const getClientTeamAccessProfile = (email = '') => {
+    const normalizedEmail = String(email || '').trim().toLowerCase()
+    if (!normalizedEmail) return null
+    try {
+      const saved = localStorage.getItem(getScopedStorageKey(CLIENT_TEAM_ACCESS_STORAGE_KEY, normalizedEmail))
+      if (!saved) return null
+      const parsed = JSON.parse(saved)
+      if (!parsed || typeof parsed !== 'object') return null
+      return {
+        role: normalizeClientTeamRole(parsed.role),
+        companyId: String(parsed.companyId || '').trim(),
+        ownerEmail: String(parsed.ownerEmail || '').trim().toLowerCase(),
+        ownerName: String(parsed.ownerName || '').trim(),
+        companyName: String(parsed.companyName || '').trim(),
+        businessType: String(parsed.businessType || '').trim(),
+        country: String(parsed.country || '').trim(),
+        currency: String(parsed.currency || '').trim(),
+        accountType: String(parsed.accountType || '').trim(),
+      }
+    } catch {
+      return null
+    }
+  }
+  const saveClientTeamAccessProfile = ({
+    email = '',
+    role = 'viewer',
+    companyId = '',
+    ownerEmail = '',
+    ownerName = '',
+    companyName = '',
+    businessType = '',
+    country = '',
+    currency = '',
+    accountType = '',
+  } = {}) => {
+    const normalizedEmail = String(email || '').trim().toLowerCase()
+    if (!normalizedEmail) return null
+    const payload = {
+      role: normalizeClientTeamRole(role),
+      companyId: String(companyId || '').trim(),
+      ownerEmail: String(ownerEmail || '').trim().toLowerCase(),
+      ownerName: String(ownerName || '').trim(),
+      companyName: String(companyName || '').trim(),
+      businessType: String(businessType || '').trim(),
+      country: String(country || '').trim(),
+      currency: String(currency || '').trim(),
+      accountType: String(accountType || '').trim(),
+    }
+    try {
+      localStorage.setItem(
+        getScopedStorageKey(CLIENT_TEAM_ACCESS_STORAGE_KEY, normalizedEmail),
+        JSON.stringify(payload),
+      )
+    } catch {
+      return null
+    }
+    return payload
+  }
+  const applyClientTeamAccessProfile = (user = {}) => {
+    const accessProfile = getClientTeamAccessProfile(user?.email)
+    if (!accessProfile) return user
+    return {
+      ...user,
+      clientTeamRole: accessProfile.role || user?.clientTeamRole || 'owner',
+      clientTeamCompanyId: accessProfile.companyId || user?.clientTeamCompanyId || '',
+      clientTeamOwnerEmail: accessProfile.ownerEmail || user?.clientTeamOwnerEmail || '',
+      clientTeamOwnerName: accessProfile.ownerName || user?.clientTeamOwnerName || '',
+      clientTeamCompanyName: accessProfile.companyName || user?.clientTeamCompanyName || '',
+      clientTeamBusinessType: accessProfile.businessType || user?.clientTeamBusinessType || '',
+      clientTeamCountry: accessProfile.country || user?.clientTeamCountry || '',
+      clientTeamCurrency: accessProfile.currency || user?.clientTeamCurrency || '',
+      clientAccountType: accessProfile.accountType || user?.clientAccountType || '',
+    }
+  }
+  const isClientTeamInviteExpired = (invite = {}) => {
+    const expiryMs = Date.parse(invite?.expiresAt || '')
+    if (!Number.isFinite(expiryMs)) return true
+    return Date.now() > expiryMs
+  }
+  const getClientTeamInviteStatus = (invite = {}) => {
+    const normalizedStatus = String(invite?.status || '').trim().toLowerCase()
+    if (normalizedStatus === 'accepted') return 'accepted'
+    if (normalizedStatus === 'cancelled' || normalizedStatus === 'canceled' || normalizedStatus === 'revoked') return 'cancelled'
+    if (normalizedStatus === 'expired') return 'expired'
+    return isClientTeamInviteExpired(invite) ? 'expired' : 'pending'
+  }
+  const getClientTeamInviteByTokenFromStorage = ({
+    token = '',
+    companyId = '',
+  } = {}) => {
+    const normalizedToken = String(token || '').trim()
+    const normalizedCompanyId = String(companyId || '').trim()
+    if (!normalizedToken || typeof localStorage === 'undefined') return null
+    const inviteKeys = Object.keys(localStorage).filter((key) => (
+      key === CLIENT_TEAM_INVITES_STORAGE_KEY
+      || key.startsWith(`${CLIENT_TEAM_INVITES_STORAGE_KEY}:`)
+    ))
+
+    for (const inviteKey of inviteKeys) {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(inviteKey) || '[]')
+        const inviteEntries = Array.isArray(parsed) ? parsed : []
+        const invite = inviteEntries.find((entry) => {
+          if (String(entry?.token || '').trim() !== normalizedToken) return false
+          if (!normalizedCompanyId) return true
+          return String(entry?.companyId || '').trim() === normalizedCompanyId
+        })
+        if (!invite) continue
+
+        const ownerEmail = inviteKey.includes(':')
+          ? inviteKey.split(':').slice(1).join(':').trim().toLowerCase()
+          : ''
+        return {
+          invite: {
+            ...invite,
+            email: String(invite?.email || '').trim().toLowerCase(),
+            role: normalizeClientTeamRole(invite?.role),
+            companyId: String(invite?.companyId || '').trim(),
+            invitedBy: String(invite?.invitedBy || '').trim(),
+            status: getClientTeamInviteStatus(invite),
+          },
+          ownerEmail,
+          invitesStorageKey: inviteKey,
+          membersStorageKey: ownerEmail ? getScopedStorageKey(CLIENT_TEAM_MEMBERS_STORAGE_KEY, ownerEmail) : CLIENT_TEAM_MEMBERS_STORAGE_KEY,
+        }
+      } catch {
+        // ignore malformed invite payloads
+      }
+    }
+    return null
+  }
+  const acceptClientTeamInviteFromStorage = ({
+    token = '',
+    companyId = '',
+    fullName = '',
+    email = '',
+  } = {}) => {
+    const inviteLookup = getClientTeamInviteByTokenFromStorage({ token, companyId })
+    if (!inviteLookup || inviteLookup.invite.status !== 'pending') {
+      return { ok: false, message: 'Invite link is invalid or has expired.' }
+    }
+
+    const normalizedEmail = String(email || inviteLookup.invite.email || '').trim().toLowerCase()
+    if (!normalizedEmail) {
+      return { ok: false, message: 'Invite email is invalid.' }
+    }
+
+    const acceptedAt = new Date().toISOString()
+    try {
+      const existingInvites = JSON.parse(localStorage.getItem(inviteLookup.invitesStorageKey) || '[]')
+      const nextInvites = (Array.isArray(existingInvites) ? existingInvites : []).map((entry) => (
+        String(entry?.token || '').trim() === String(inviteLookup.invite.token || '').trim()
+          ? {
+            ...entry,
+            status: 'accepted',
+            acceptedAt,
+          }
+          : entry
+      ))
+      localStorage.setItem(inviteLookup.invitesStorageKey, JSON.stringify(nextInvites))
+    } catch {
+      return { ok: false, message: 'Unable to update invite status right now.' }
+    }
+
+    try {
+      const existingMembers = JSON.parse(localStorage.getItem(inviteLookup.membersStorageKey) || '[]')
+      const memberEntries = Array.isArray(existingMembers) ? existingMembers : []
+      const existingIndex = memberEntries.findIndex((entry) => (
+        String(entry?.email || '').trim().toLowerCase() === normalizedEmail
+      ))
+      const nextMember = {
+        ...(existingIndex >= 0 ? memberEntries[existingIndex] : {}),
+        id: existingIndex >= 0
+          ? String(memberEntries[existingIndex]?.id || '').trim() || `TM-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+          : `TM-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        email: normalizedEmail,
+        fullName: String(fullName || memberEntries[existingIndex]?.fullName || normalizedEmail).trim(),
+        role: normalizeClientTeamRole(inviteLookup.invite.role),
+        companyId: String(inviteLookup.invite.companyId || '').trim(),
+        status: 'Active',
+        joinedAt: acceptedAt,
+        isPrimaryOwner: false,
+      }
+      const nextMembers = [...memberEntries]
+      if (existingIndex >= 0) nextMembers[existingIndex] = nextMember
+      else nextMembers.unshift(nextMember)
+      localStorage.setItem(inviteLookup.membersStorageKey, JSON.stringify(nextMembers))
+    } catch {
+      return { ok: false, message: 'Unable to add the invited team member right now.' }
+    }
+
+    saveClientTeamAccessProfile({
+      email: normalizedEmail,
+      role: inviteLookup.invite.role,
+      companyId: inviteLookup.invite.companyId,
+      ownerEmail: inviteLookup.ownerEmail,
+      ownerName: inviteLookup.invite.invitedBy,
+    })
+
+    return {
+      ok: true,
+      invite: inviteLookup.invite,
+      ownerEmail: inviteLookup.ownerEmail,
+    }
+  }
+  const buildClientTeamInviteLookup = (payload = {}) => {
+    const invite = payload?.invite && typeof payload.invite === 'object'
+      ? payload.invite
+      : null
+    if (!invite?.token) return null
+    const owner = payload?.owner && typeof payload.owner === 'object'
+      ? payload.owner
+      : {}
+    return {
+      invite: {
+        ...invite,
+        email: String(invite?.email || '').trim().toLowerCase(),
+        role: normalizeClientTeamRole(invite?.role),
+        companyId: String(invite?.companyId || '').trim(),
+        invitedBy: String(invite?.invitedBy || owner?.fullName || '').trim(),
+        status: getClientTeamInviteStatus(invite),
+      },
+      ownerEmail: String(owner?.email || '').trim().toLowerCase(),
+      invitesStorageKey: '',
+      membersStorageKey: '',
+    }
+  }
+  const buildPendingClientTeamInvitePlaceholder = ({
+    token = '',
+    companyId = '',
+    email = '',
+  } = {}) => {
+    const normalizedToken = String(token || '').trim()
+    const normalizedCompanyId = String(companyId || '').trim()
+    const normalizedEmail = String(email || '').trim().toLowerCase()
+    if (!normalizedToken || !normalizedCompanyId || !normalizedEmail) return null
+    return {
+      invite: {
+        token: normalizedToken,
+        companyId: normalizedCompanyId,
+        email: normalizedEmail,
+        role: 'viewer',
+        invitedBy: '',
+        status: 'pending',
+      },
+      ownerEmail: '',
+      invitesStorageKey: '',
+      membersStorageKey: '',
+    }
+  }
+  const getClientTeamInviteByToken = async ({
+    token = '',
+    companyId = '',
+  } = {}) => {
+    const normalizedToken = String(token || '').trim()
+    const normalizedCompanyId = String(companyId || '').trim()
+    if (!normalizedToken) return null
+
+    const backendLookup = await fetchPublicClientTeamInvite({
+      token: normalizedToken,
+      companyId: normalizedCompanyId,
+    })
+    if (backendLookup.ok) {
+      return buildClientTeamInviteLookup(backendLookup.data)
+    }
+
+    const storageLookup = getClientTeamInviteByTokenFromStorage({
+      token: normalizedToken,
+      companyId: normalizedCompanyId,
+    })
+    if (storageLookup) return storageLookup
+
+    return null
+  }
+  const acceptClientTeamInvite = async ({
+    token = '',
+    companyId = '',
+    fullName = '',
+    email = '',
+  } = {}) => {
+    const normalizedToken = String(token || '').trim()
+    const normalizedCompanyId = String(companyId || '').trim()
+    const normalizedEmail = String(email || '').trim().toLowerCase()
+    const backendResult = await acceptClientTeamInviteFromBackend({
+      token: normalizedToken,
+      companyId: normalizedCompanyId,
+      email: normalizedEmail,
+      fullName: String(fullName || '').trim(),
+    })
+    if (backendResult.ok) {
+      const teamAccess = backendResult.data?.teamAccess && typeof backendResult.data.teamAccess === 'object'
+        ? backendResult.data.teamAccess
+        : {}
+      saveClientTeamAccessProfile({
+        email: normalizedEmail,
+        role: teamAccess.role || backendResult.data?.invite?.role || 'viewer',
+        companyId: teamAccess.companyId || normalizedCompanyId,
+        ownerEmail: teamAccess.ownerEmail || backendResult.data?.owner?.email || '',
+        ownerName: teamAccess.ownerName || backendResult.data?.owner?.fullName || '',
+        companyName: teamAccess.companyName || backendResult.data?.owner?.companyName || '',
+        businessType: teamAccess.businessType || backendResult.data?.owner?.businessType || '',
+        country: teamAccess.country || backendResult.data?.owner?.country || '',
+        currency: teamAccess.currency || backendResult.data?.owner?.currency || '',
+        accountType: teamAccess.accountType || 'team-member',
+      })
+      return {
+        ok: true,
+        invite: backendResult.data?.invite || null,
+        ownerEmail: String(teamAccess.ownerEmail || backendResult.data?.owner?.email || '').trim().toLowerCase(),
+      }
+    }
+
+    return acceptClientTeamInviteFromStorage({
+      token: normalizedToken,
+      companyId: normalizedCompanyId,
+      fullName,
+      email: normalizedEmail,
+    })
+  }
   const getStoredAuthUser = () => {
     try {
       const sessionUser = sessionStorage.getItem('kiaminaAuthUser')
-      if (sessionUser) return normalizeUser(JSON.parse(sessionUser))
+      if (sessionUser) return applyClientTeamAccessProfile(normalizeUser(JSON.parse(sessionUser)))
       const persistentUser = localStorage.getItem('kiaminaAuthUser')
-      return persistentUser ? normalizeUser(JSON.parse(persistentUser)) : null
+      return persistentUser ? applyClientTeamAccessProfile(normalizeUser(JSON.parse(persistentUser))) : null
     } catch {
       return null
     }
@@ -2329,6 +2750,21 @@ function App() {
   const [isAdminSetupRouteActive, setIsAdminSetupRouteActive] = useState(() => (
     normalizeAppPathname(typeof window === 'undefined' ? '/' : window.location.pathname) === '/admin/setup'
   ))
+  const [pendingClientTeamInvite, setPendingClientTeamInvite] = useState(() => {
+    if (typeof window === 'undefined') return null
+    if (normalizeAppPathname(window.location.pathname || '/') !== '/team/setup') return null
+    const params = new URLSearchParams(window.location.search || '')
+    return buildPendingClientTeamInvitePlaceholder({
+      token: params.get('invite') || '',
+      companyId: params.get('company') || '',
+      email: params.get('email') || '',
+    })
+  })
+  const [clientTeamInviteSetupMessage, setClientTeamInviteSetupMessage] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    if (normalizeAppPathname(window.location.pathname || '/') !== '/team/setup') return ''
+    return 'Checking invite details...'
+  })
   const [ownerBootstrapStatus, setOwnerBootstrapStatus] = useState(() => createOwnerBootstrapStatusState())
   const [adminSetupSuccessState, setAdminSetupSuccessState] = useState(null)
   const [impersonationSession, setImpersonationSession] = useState(initialImpersonationSession)
@@ -2599,6 +3035,14 @@ function App() {
     ? impersonationSession.clientEmail
     : authUser?.email
   const normalizedScopedClientEmail = (scopedClientEmail || '').trim().toLowerCase()
+  const clientTeamAffiliation = isImpersonatingClient
+    ? null
+    : buildClientTeamAffiliationState({
+        authUser,
+        settingsProfile: settingsProfileSnapshot,
+        onboardingData: onboardingState.data,
+        companyName,
+      })
   const scopedClientUid = String(
     isImpersonatingClient
       ? (
@@ -2657,15 +3101,9 @@ function App() {
     || hasIsoTimestamp(scopedClientStatusControl?.businessVerificationApprovedAt)
     || String(dashboardVerificationState || '').toLowerCase() === 'verified',
   )
-  const isIndividualBusinessType = String(
-    verificationProgress.profile.businessType || onboardingState.data?.businessType || '',
-  ).trim().toLowerCase() === 'individual'
-  const isBusinessVerificationComplete = Boolean(
-    verificationProgress.businessStepCompleted
-    && (isIndividualBusinessType || businessVerificationApprovedByAdmin),
-  )
-  // const isIdentityVerificationComplete = Boolean(verificationProgress.identityStepCompleted)
-  const isIdentityVerificationComplete = Boolean(isBusinessVerificationComplete)
+  const isBusinessVerificationComplete = true
+  // Identity verification is also bypassed in MVP mode.
+  const isIdentityVerificationComplete = true
   const isClientVerificationLocked = Boolean(
     isAuthenticated
     && !isAdminView
@@ -3133,6 +3571,8 @@ function App() {
     setPasswordResetEmail('')
     setAdminSetupToken('')
     setIsAdminSetupRouteActive(false)
+    setPendingClientTeamInvite(null)
+    setClientTeamInviteSetupMessage('')
     setActiveFolderRoute(null)
     setPublicSitePage(resolvedPage)
     try {
@@ -3161,6 +3601,8 @@ function App() {
     setAdminSetupSuccessState(null)
     setAdminSetupToken('')
     setIsAdminSetupRouteActive(false)
+    setPendingClientTeamInvite(null)
+    setClientTeamInviteSetupMessage('')
     const resetEmailQuery = normalizedMode === 'reset-password' && passwordResetEmail
       ? `&email=${encodeURIComponent(String(passwordResetEmail || '').trim().toLowerCase())}`
       : ''
@@ -3202,6 +3644,8 @@ function App() {
     setAdminSetupSuccessState(null)
     setAdminSetupToken('')
     setIsAdminSetupRouteActive(false)
+    setPendingClientTeamInvite(null)
+    setClientTeamInviteSetupMessage('')
     try {
       if (replace) history.replaceState({}, '', '/admin/login')
       else history.pushState({}, '', '/admin/login')
@@ -3220,6 +3664,8 @@ function App() {
     setAdminSetupSuccessState(null)
     setAdminSetupToken(normalizedInviteToken)
     setIsAdminSetupRouteActive(true)
+    setPendingClientTeamInvite(null)
+    setClientTeamInviteSetupMessage('')
     try {
       const nextPath = normalizedInviteToken
         ? `/admin/setup?invite=${encodeURIComponent(normalizedInviteToken)}`
@@ -3236,6 +3682,8 @@ function App() {
     setIsPublicSiteView(false)
     setAdminSetupToken('')
     setIsAdminSetupRouteActive(false)
+    setPendingClientTeamInvite(null)
+    setClientTeamInviteSetupMessage('')
     setPublicSitePage('home')
     setActiveFolderRoute(null)
     setActivePage(ADMIN_DEFAULT_PAGE)
@@ -3246,6 +3694,8 @@ function App() {
 
   const handleReturnToAdminLoginFromSetup = async () => {
     setAdminSetupSuccessState(null)
+    setPendingClientTeamInvite(null)
+    setClientTeamInviteSetupMessage('')
     if (isAuthenticated) {
       try {
         const activeSessionId = String(getApiSessionId() || '').trim()
@@ -3346,10 +3796,51 @@ function App() {
 
   useEffect(() => {
     // Initialize route from URL on first load
+    let isCancelled = false
     const syncFromLocation = () => {
       const path = normalizeAppPathname(window.location.pathname || '/')
       if (path !== '/admin/setup') {
         setAdminSetupSuccessState(null)
+      }
+      if (path === '/team/setup') {
+        const params = new URLSearchParams(window.location.search || '')
+        const token = params.get('invite') || ''
+        const companyId = params.get('company') || ''
+        const email = params.get('email') || ''
+        const invitePlaceholder = buildPendingClientTeamInvitePlaceholder({
+          token,
+          companyId,
+          email,
+        })
+        setShowAuth(true)
+        setShowAdminLogin(false)
+        setIsPublicSiteView(false)
+        setAdminSetupToken('')
+        setIsAdminSetupRouteActive(false)
+        setActiveFolderRoute(null)
+        setPublicSitePage('home')
+        setAuthMode('signup')
+        setPasswordResetEmail('')
+        setEmailVerificationEmail('')
+        setPendingClientTeamInvite(invitePlaceholder)
+        setClientTeamInviteSetupMessage('Checking invite details...')
+        void (async () => {
+          const inviteLookup = await getClientTeamInviteByToken({
+            token,
+            companyId,
+            email,
+          })
+          if (isCancelled) return
+          setPendingClientTeamInvite(inviteLookup)
+          if (!inviteLookup || inviteLookup.invite.status !== 'pending') {
+            setClientTeamInviteSetupMessage('This team invite is invalid or has expired. Ask the primary owner for a fresh invite link.')
+            return
+          }
+          setClientTeamInviteSetupMessage(
+            `You were invited by ${inviteLookup.invite.invitedBy || 'the primary owner'} to join this workspace as ${normalizeClientTeamRole(inviteLookup.invite.role)}. Create your account with the invited email below.`,
+          )
+        })()
+        return
       }
       const publicSitePageCandidate = resolvePublicSitePageFromPathname(path)
       if (publicSitePageCandidate) {
@@ -3358,6 +3849,8 @@ function App() {
         setIsPublicSiteView(true)
         setAdminSetupToken('')
         setIsAdminSetupRouteActive(false)
+        setPendingClientTeamInvite(null)
+        setClientTeamInviteSetupMessage('')
         setActiveFolderRoute(null)
         setPublicSitePage(publicSitePageCandidate)
         return
@@ -3377,6 +3870,8 @@ function App() {
         setIsPublicSiteView(false)
         setAdminSetupToken('')
         setIsAdminSetupRouteActive(false)
+        setPendingClientTeamInvite(null)
+        setClientTeamInviteSetupMessage('')
         setActiveFolderRoute(null)
         setPublicSitePage('home')
         setAuthMode(resolvedAuthMode)
@@ -3390,6 +3885,8 @@ function App() {
         setIsPublicSiteView(false)
         setAdminSetupToken('')
         setIsAdminSetupRouteActive(false)
+        setPendingClientTeamInvite(null)
+        setClientTeamInviteSetupMessage('')
         setActiveFolderRoute(null)
         setPublicSitePage('home')
         setAuthMode('login')
@@ -3404,6 +3901,8 @@ function App() {
         setIsPublicSiteView(false)
         setAdminSetupToken(inviteToken)
         setIsAdminSetupRouteActive(true)
+        setPendingClientTeamInvite(null)
+        setClientTeamInviteSetupMessage('')
         setActiveFolderRoute(null)
         setPublicSitePage('home')
         setAuthMode('login')
@@ -3420,6 +3919,8 @@ function App() {
         setIsPublicSiteView(false)
         setAdminSetupToken('')
         setIsAdminSetupRouteActive(false)
+        setPendingClientTeamInvite(null)
+        setClientTeamInviteSetupMessage('')
         setImpersonationSession(null)
         setAdminImpersonationSession(null)
         setPendingGoogleSocialAuth(null)
@@ -3450,6 +3951,8 @@ function App() {
         setAdminSetupSuccessState(null)
         setAdminSetupToken('')
         setIsAdminSetupRouteActive(true)
+        setPendingClientTeamInvite(null)
+        setClientTeamInviteSetupMessage('')
         setImpersonationSession(null)
         setAdminImpersonationSession(null)
         setPendingGoogleSocialAuth(null)
@@ -3476,6 +3979,8 @@ function App() {
         setIsPublicSiteView(false)
         setAdminSetupToken('')
         setIsAdminSetupRouteActive(false)
+        setPendingClientTeamInvite(null)
+        setClientTeamInviteSetupMessage('')
         setPublicSitePage('home')
         setActivePage(folderCategory)
         setActiveFolderRoute({ category: folderCategory, folderId })
@@ -3488,6 +3993,8 @@ function App() {
         setIsPublicSiteView(false)
         setAdminSetupToken('')
         setIsAdminSetupRouteActive(false)
+        setPendingClientTeamInvite(null)
+        setClientTeamInviteSetupMessage('')
         setPublicSitePage('home')
         setActiveFolderRoute(null)
         setActivePage('support')
@@ -3499,6 +4006,8 @@ function App() {
         setIsPublicSiteView(false)
         setAdminSetupToken('')
         setIsAdminSetupRouteActive(false)
+        setPendingClientTeamInvite(null)
+        setClientTeamInviteSetupMessage('')
         setPublicSitePage('home')
         setActiveFolderRoute(null)
         setActivePage(candidate)
@@ -3509,6 +4018,8 @@ function App() {
       setShowAdminLogin(false)
       setAdminSetupToken('')
       setIsAdminSetupRouteActive(false)
+      setPendingClientTeamInvite(null)
+      setClientTeamInviteSetupMessage('')
       setActiveFolderRoute(null)
       setPasswordResetEmail('')
       if (isAuthenticated) {
@@ -3525,7 +4036,10 @@ function App() {
 
     const onPop = () => syncFromLocation()
     window.addEventListener('popstate', onPop)
-    return () => window.removeEventListener('popstate', onPop)
+    return () => {
+      isCancelled = true
+      window.removeEventListener('popstate', onPop)
+    }
   }, [initialAuthUser?.role, isAuthenticated])
 
   useEffect(() => {
@@ -4020,7 +4534,11 @@ function App() {
 
   const setOnboardingData = (updater) => {
     const targetEmail = scopedClientEmail
-    const nextData = typeof updater === 'function' ? updater(onboardingState.data) : updater
+    const rawNextData = typeof updater === 'function' ? updater(onboardingState.data) : updater
+    const nextData = applyTeamAffiliationBusinessFields({
+      data: rawNextData,
+      affiliation: clientTeamAffiliation,
+    })
     persistOnboardingState({ ...onboardingState, data: nextData }, targetEmail)
     const nextVerificationProgress = resolveVerificationProgress({
       onboardingData: nextData,
@@ -4437,6 +4955,9 @@ function App() {
         || resolvedEmail.split('@')[0]
         || 'User',
       ).trim()
+      const backendTeamAccess = payload?.clientWorkspace?.teamAccess && typeof payload.clientWorkspace.teamAccess === 'object'
+        ? payload.clientWorkspace.teamAccess
+        : {}
 
       return {
         ok: true,
@@ -4459,6 +4980,19 @@ function App() {
           roleInCompany: String(payload?.adminProfile?.jobTitle || '').trim(),
           department: String(payload?.adminProfile?.department || '').trim(),
           phoneNumber: String(payload?.adminProfile?.phone || '').trim(),
+          ...(backendTeamAccess.role
+            ? {
+                clientTeamRole: normalizeClientTeamRole(backendTeamAccess.role || ''),
+                clientTeamCompanyId: String(backendTeamAccess.companyId || '').trim(),
+                clientTeamOwnerEmail: String(backendTeamAccess.ownerEmail || '').trim().toLowerCase(),
+                clientTeamOwnerName: String(backendTeamAccess.ownerName || '').trim(),
+                clientTeamCompanyName: String(backendTeamAccess.companyName || '').trim(),
+                clientTeamBusinessType: String(backendTeamAccess.businessType || '').trim(),
+                clientTeamCountry: String(backendTeamAccess.country || '').trim(),
+                clientTeamCurrency: String(backendTeamAccess.currency || '').trim(),
+                clientAccountType: String(backendTeamAccess.accountType || '').trim() || 'team-member',
+              }
+            : {}),
           firebaseIdToken: token,
         }),
       }
@@ -4480,10 +5014,10 @@ function App() {
   }
 
   const persistAuthenticatedUserRecord = (user, storageType = 'local') => {
-    const normalizedUser = normalizeUser({
+    const normalizedUser = applyClientTeamAccessProfile(normalizeUser({
       ...user,
       sessionIssuedAtIso: new Date().toISOString(),
-    })
+    }))
     if (!normalizedUser) return null
     if (storageType === 'local') {
       localStorage.setItem('kiaminaAuthUser', JSON.stringify(normalizedUser))
@@ -5062,12 +5596,12 @@ function App() {
         user: hydratedProfile.user || null,
       })
 
-      const user = normalizeUser({
+      const user = applyClientTeamAccessProfile(normalizeUser({
         ...(hydratedProfile.user || {}),
         fullName: String(hydratedProfile?.user?.fullName || resolvedFullName).trim() || resolvedFullName,
         sessionId: issuedSessionId,
         firebaseIdToken: googleContext.idToken,
-      })
+      }))
       logGoogleAppDebug('persist-user', {
         email: user?.email,
         role: user?.role,
@@ -5672,6 +6206,8 @@ function App() {
     password,
     confirmPassword,
     agree,
+    teamInviteToken = '',
+    teamInviteCompanyId = '',
   }) => {
     const signupPasswordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
     const normalizedNameDraft = normalizeClientNameDraft({ firstName, lastName, otherNames })
@@ -5680,11 +6216,43 @@ function App() {
     const normalizedCompanyName = String(companyName || '').trim()
     const normalizedBusinessType = String(businessType || '').trim()
     const normalizedCountry = String(country || '').trim()
+    const normalizedEmail = email.trim().toLowerCase()
+    const inviteLookup = teamInviteToken
+      ? await getClientTeamInviteByToken({
+        token: teamInviteToken,
+        companyId: teamInviteCompanyId,
+        email: normalizedEmail,
+      })
+      : null
+    if (teamInviteToken && (!inviteLookup || inviteLookup.invite.status !== 'pending')) {
+      return { ok: false, message: 'This team invite is invalid or has expired.' }
+    }
+
+    if (inviteLookup && normalizedEmail !== String(inviteLookup.invite.email || '').trim().toLowerCase()) {
+      return { ok: false, message: 'Use the invited email address to complete team onboarding.' }
+    }
+
+    const inviteOwner = inviteLookup?.owner && typeof inviteLookup.owner === 'object'
+      ? inviteLookup.owner
+      : {}
+    const resolvedSignupCompanyName = inviteLookup
+      ? String(normalizedCompanyName || inviteOwner.companyName || '').trim()
+      : normalizedCompanyName
+    const resolvedSignupBusinessType = inviteLookup
+      ? String(normalizedBusinessType || inviteOwner.businessType || '').trim()
+      : normalizedBusinessType
+    const resolvedSignupCountry = inviteLookup
+      ? String(normalizedCountry || inviteOwner.country || '').trim()
+      : normalizedCountry
+    const resolvedSignupCurrency = inviteLookup
+      ? String(inviteOwner.currency || '').trim()
+      : ''
+
     const signupCapture = buildSignupCapturePayload({
-      signupSource: 'email-signup',
+      signupSource: inviteLookup ? 'team-invite-signup' : 'email-signup',
       signupLocation: normalizedCountry,
-      capturePage: 'signup',
-      capturePath: '/signup',
+      capturePage: inviteLookup ? 'team-setup' : 'signup',
+      capturePath: inviteLookup ? '/team/setup' : '/signup',
     })
     if (
       !normalizedFullName
@@ -5722,7 +6290,6 @@ function App() {
       }
     }
 
-    const normalizedEmail = email.trim().toLowerCase()
     const phoneAvailability = await checkClientPhoneAvailability(normalizedPhoneNumber)
     if (!phoneAvailability.ok || !phoneAvailability.available) {
       return {
@@ -5749,14 +6316,24 @@ function App() {
         otherNames: normalizedNameDraft.otherNames,
         fullName: normalizedFullName,
         phoneNumber: normalizedPhoneNumber,
-        companyName: normalizedCompanyName,
-        businessType: normalizedBusinessType,
-        country: normalizedCountry,
+        companyName: resolvedSignupCompanyName,
+        businessType: resolvedSignupBusinessType,
+        country: resolvedSignupCountry,
+        currency: resolvedSignupCurrency,
         email: normalizedEmail,
         password,
         role: 'client',
         createdAt: new Date().toISOString(),
         signupCapture,
+        teamInvite: inviteLookup
+          ? {
+            token: String(inviteLookup.invite.token || '').trim(),
+            companyId: String(inviteLookup.invite.companyId || '').trim(),
+            ownerEmail: String(inviteLookup.ownerEmail || '').trim().toLowerCase(),
+            ownerName: String(inviteLookup.invite.invitedBy || '').trim(),
+            role: normalizeClientTeamRole(inviteLookup.invite.role),
+          }
+          : null,
       },
     })
     return { ok: true, requiresOtp: true }
@@ -6034,6 +6611,7 @@ function App() {
             businessType: pendingSignup.businessType || '',
             businessName: pendingSignup.companyName || '',
             country: pendingSignup.country || '',
+            currency: pendingSignup.currency || '',
             signupCapture: pendingSignup.signupCapture || {},
           },
         })
@@ -6053,6 +6631,7 @@ function App() {
             businessType: pendingSignup.businessType || '',
             businessName: pendingSignup.companyName || '',
             country: pendingSignup.country || '',
+            currency: pendingSignup.currency || '',
           },
         })
         persistOnboardingState({
@@ -6071,6 +6650,7 @@ function App() {
             businessType: pendingSignup.businessType || '',
             businessName: pendingSignup.companyName || '',
             country: pendingSignup.country || '',
+            currency: pendingSignup.currency || '',
             primaryContact: pendingSignupFullName,
           },
         }, pendingSignup.email)
@@ -6090,10 +6670,35 @@ function App() {
           details: 'Client completed signup and verification email was issued.',
         })
 
+        const acceptedTeamInvite = pendingSignup?.teamInvite && typeof pendingSignup.teamInvite === 'object'
+          ? await acceptClientTeamInvite({
+            token: String(pendingSignup.teamInvite.token || '').trim(),
+            companyId: String(pendingSignup.teamInvite.companyId || '').trim(),
+            fullName: pendingSignupFullName,
+            email: pendingSignup.email,
+          })
+          : { ok: true }
+        if (!acceptedTeamInvite.ok) {
+          return { ok: false, message: acceptedTeamInvite.message || 'Unable to activate the team invite right now.' }
+        }
+
         setOtpChallenge(null)
         setPasswordResetEmail('')
         setEmailVerificationEmail(pendingSignup.email)
         setAuthMode('email-verification')
+        if (pendingSignup?.teamInvite) {
+          setPendingClientTeamInvite(null)
+          setClientTeamInviteSetupMessage('')
+          try {
+            history.replaceState(
+              {},
+              '',
+              `/login?mode=email-verification&email=${encodeURIComponent(String(pendingSignup.email || '').trim().toLowerCase())}`,
+            )
+          } catch {
+            // ignore
+          }
+        }
         showToast('success', 'A verification link has been sent to your email address.')
         return {
           ok: true,
@@ -6322,11 +6927,11 @@ function App() {
         fallbackRole,
         authorizationToken: firebaseIdToken,
       })
-      const user = normalizeUser({
+      const user = applyClientTeamAccessProfile(normalizeUser({
         ...(hydratedProfile.user || {}),
         sessionId: issuedSessionId,
         firebaseIdToken,
-      })
+      }))
       if (normalizedPurpose === 'admin-login' && normalizeRole(user.role, user.email) !== 'admin') {
         return { ok: false, message: 'This account does not have admin access.' }
       }
@@ -7153,6 +7758,19 @@ function App() {
     if (typeof setClientFirstName === 'function') {
       setClientFirstName(normalizedProfile.firstName || 'Client')
     }
+    if (
+      !isImpersonatingClient
+      && currentUserRole === 'client'
+      && targetEmail
+      && targetEmail === String(authUser?.email || '').trim().toLowerCase()
+    ) {
+      syncCurrentUserEmail({
+        previousEmail: targetEmail,
+        nextEmail: targetEmail,
+        nextFullName: normalizedProfile.fullName || authUser?.fullName || '',
+        nextRoleInCompany: normalizedProfile.roleInCompany || authUser?.roleInCompany || '',
+      })
+    }
     return { ok: true, profile: normalizedProfile }
   }
 
@@ -7192,8 +7810,12 @@ function App() {
   }
 
   const handleCompleteOnboarding = async (finalData) => {
+    const resolvedFinalData = applyTeamAffiliationBusinessFields({
+      data: finalData,
+      affiliation: clientTeamAffiliation,
+    })
     const finalVerificationProgress = resolveVerificationProgress({
-      onboardingData: finalData,
+      onboardingData: resolvedFinalData,
       settingsDocs: readScopedVerificationDocs(scopedClientEmail),
       settingsProfile: readScopedSettingsProfile(scopedClientEmail),
     })
@@ -7205,7 +7827,7 @@ function App() {
       completed: true,
       skipped: false,
       verificationPending,
-      data: finalData,
+      data: resolvedFinalData,
     }, scopedClientEmail)
     setSettingsProfileSnapshot(finalVerificationProgress.profile)
     setVerificationDocsSnapshot(finalVerificationProgress.docs)
@@ -7220,16 +7842,16 @@ function App() {
       : (authUser?.fullName || existing.fullName || '')
     const existingNameParts = resolveSettingsProfileNameParts(existing)
     const resolvedOnboardingNames = {
-      firstName: String(finalData.firstName || existingNameParts.firstName || '').trim(),
-      lastName: String(finalData.lastName || existingNameParts.lastName || '').trim(),
-      otherNames: String(finalData.otherNames || existingNameParts.otherNames || '').trim(),
+      firstName: String(resolvedFinalData.firstName || existingNameParts.firstName || '').trim(),
+      lastName: String(resolvedFinalData.lastName || existingNameParts.lastName || '').trim(),
+      otherNames: String(resolvedFinalData.otherNames || existingNameParts.otherNames || '').trim(),
     }
     const resolvedFullName = buildSettingsProfileFullName(resolvedOnboardingNames)
-      || String(finalData.primaryContact || effectiveFullName).trim()
+      || String(resolvedFinalData.primaryContact || effectiveFullName).trim()
       || effectiveFullName
     const resolvedPhone = sanitizeClientPhoneLocalNumber(
-      Object.prototype.hasOwnProperty.call(finalData, 'phone')
-        ? finalData.phone
+      Object.prototype.hasOwnProperty.call(resolvedFinalData, 'phone')
+        ? resolvedFinalData.phone
         : (existing.phoneLocalNumber || existing.phone || ''),
     )
     const resolvedPhoneCountryCode = String(existing.phoneCountryCode || '+234').trim() || '+234'
@@ -7239,22 +7861,22 @@ function App() {
       firstName: resolvedOnboardingNames.firstName,
       lastName: resolvedOnboardingNames.lastName,
       otherNames: resolvedOnboardingNames.otherNames,
-      email: String(scopedClientEmail || finalData.email || existing.email || '').trim().toLowerCase(),
+      email: String(scopedClientEmail || resolvedFinalData.email || existing.email || '').trim().toLowerCase(),
       phone: resolvedPhone,
       phoneCountryCode: resolvedPhoneCountryCode,
       phoneLocalNumber: resolvedPhone,
-      roleInCompany: String(finalData.roleInCompany ?? existing.roleInCompany ?? '').trim(),
-      businessType: finalData.businessType,
-      businessName: finalData.businessName,
-      country: finalData.country,
-      industry: finalData.industry,
-      industryOther: finalData.industryOther,
-      cacNumber: finalData.cacNumber,
-      tin: finalData.tin,
-      reportingCycle: finalData.reportingCycle,
-      startMonth: finalData.startMonth,
-      currency: finalData.currency,
-      language: finalData.language,
+      roleInCompany: String(resolvedFinalData.roleInCompany ?? existing.roleInCompany ?? '').trim(),
+      businessType: resolvedFinalData.businessType,
+      businessName: resolvedFinalData.businessName,
+      country: resolvedFinalData.country,
+      industry: resolvedFinalData.industry,
+      industryOther: resolvedFinalData.industryOther,
+      cacNumber: resolvedFinalData.cacNumber,
+      tin: resolvedFinalData.tin,
+      reportingCycle: resolvedFinalData.reportingCycle,
+      startMonth: resolvedFinalData.startMonth,
+      currency: resolvedFinalData.currency,
+      language: resolvedFinalData.language,
     }
     setClientWorkspaceCache(scopedClientEmail, {
       settingsProfile: merged,
@@ -7266,7 +7888,7 @@ function App() {
 
     const defaultLandingPage = isImpersonatingClient
       ? 'dashboard'
-      : (finalData.defaultLandingPage || getDefaultPageForRole(currentUserRole))
+      : (resolvedFinalData.defaultLandingPage || getDefaultPageForRole(currentUserRole))
     handleSetActivePage(defaultLandingPage, { replace: true })
 
     const authorizationToken = String(authUser?.firebaseIdToken || '').trim()
@@ -7274,8 +7896,8 @@ function App() {
       await persistClientOnboardingToBackend({
         authorizationToken,
         email: scopedClientEmail || authUser?.email || '',
-        fullName: merged.fullName || authUser?.fullName || finalData.primaryContact || '',
-        onboardingData: finalData,
+        fullName: merged.fullName || authUser?.fullName || resolvedFinalData.primaryContact || '',
+        onboardingData: resolvedFinalData,
         defaultLandingPage,
       })
       await refreshClientDashboardOverview({ authorizationToken })
@@ -8007,6 +8629,9 @@ function App() {
             verificationState={dashboardVerificationState}
             businessApprovedByAdmin={businessVerificationApprovedByAdmin}
             clientTeamRole={isImpersonatingClient ? 'owner' : (authUser?.clientTeamRole || 'owner')}
+            clientTeamOwnerEmail={isImpersonatingClient ? '' : (authUser?.clientTeamOwnerEmail || '')}
+            clientTeamOwnerName={isImpersonatingClient ? '' : (authUser?.clientTeamOwnerName || '')}
+            clientTeamAffiliation={isImpersonatingClient ? null : clientTeamAffiliation}
             initialSettingsProfile={settingsProfileSnapshot}
             initialVerificationDocs={verificationDocsSnapshot}
             initialAccountSettings={accountSettingsSnapshot}
@@ -8216,6 +8841,13 @@ function App() {
             onVerifyOtp={handleVerifyOtp}
             onResendOtp={handleResendOtp}
             onCancelOtp={handleCancelOtp}
+            signupPrefill={pendingClientTeamInvite ? {
+              email: pendingClientTeamInvite.invite.email,
+              lockEmail: true,
+              inviteToken: pendingClientTeamInvite.invite.token,
+              companyId: pendingClientTeamInvite.invite.companyId,
+            } : null}
+            signupContextNotice={authMode === 'signup' ? clientTeamInviteSetupMessage : ''}
           />
         ) : (
           <PreliminaryCorporateSite
@@ -8249,6 +8881,7 @@ function App() {
           onSkip={handleSkipOnboarding}
           onComplete={handleCompleteOnboarding}
           showToast={showClientToast}
+          teamAffiliation={clientTeamAffiliation}
         />
       ) : isAdminView && !isImpersonatingClient ? (
         <>

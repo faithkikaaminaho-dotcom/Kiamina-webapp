@@ -117,6 +117,8 @@ const ADMIN_INVITES_STORAGE_KEY = 'kiaminaAdminInvites'
 const ADMIN_NOTIFICATIONS_SYNC_EVENT = 'kiamina:admin-notifications-sync'
 const ADMIN_CLIENT_MANAGEMENT_SYNC_EVENT = 'kiamina:admin-client-management-sync'
 const ADMIN_ACTIVITY_SYNC_EVENT = 'kiamina:admin-activity-sync'
+const ADMIN_DASHBOARD_STORAGE_MIGRATION_KEY_PREFIX = 'kiaminaAdminDashboardStorageBackendSynced'
+const ADMIN_DASHBOARD_STORAGE_SYNC_DEBOUNCE_MS = 400
 const DASHBOARD_REFRESH_INTERVAL_MS = 15000
 const DASHBOARD_INVITE_EXPIRING_SOON_MS = 12 * 60 * 60 * 1000
 const DASHBOARD_SCHEDULED_SOON_MS = 24 * 60 * 60 * 1000
@@ -201,6 +203,9 @@ const BACKEND_CLIENT_ROWS_CACHE = {
   fetchedAtIso: '',
 }
 let backendClientRowsRefreshPromise = null
+let pendingAdminDashboardStoragePatch = {}
+let adminDashboardStorageSyncTimer = null
+let adminDashboardStorageSyncInFlight = false
 
 const readStoredAuthUserForAdminData = () => {
   if (typeof window === 'undefined') return null
@@ -636,8 +641,14 @@ const getAdminWorkSessionsFromStorage = () => {
     .sort((left, right) => (Date.parse(right.clockInAt) || 0) - (Date.parse(left.clockInAt) || 0))
 }
 
-const writeAdminWorkSessionsToStorage = (sessions = []) => {
-  localStorage.setItem(ADMIN_WORK_SESSIONS_STORAGE_KEY, JSON.stringify(Array.isArray(sessions) ? sessions : []))
+const writeAdminWorkSessionsToStorage = (sessions = [], { syncToBackend = true } = {}) => {
+  const normalizedSessions = Array.isArray(sessions) ? sessions : []
+  localStorage.setItem(ADMIN_WORK_SESSIONS_STORAGE_KEY, JSON.stringify(normalizedSessions))
+  if (syncToBackend) {
+    queueAdminDashboardStorageSync({
+      workSessions: normalizedSessions,
+    })
+  }
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(ADMIN_WORK_SESSIONS_SYNC_EVENT))
   }
@@ -984,6 +995,24 @@ const emitAdminNotificationsSync = () => {
   window.dispatchEvent(new Event(ADMIN_NOTIFICATIONS_SYNC_EVENT))
 }
 
+const getAdminDashboardStorageMigrationKey = () => {
+  const authUser = readStoredAuthUserForAdminData()
+  const normalizedEmail = String(authUser?.email || '').trim().toLowerCase()
+  return normalizedEmail
+    ? `${ADMIN_DASHBOARD_STORAGE_MIGRATION_KEY_PREFIX}:${normalizedEmail}`
+    : ADMIN_DASHBOARD_STORAGE_MIGRATION_KEY_PREFIX
+}
+
+const hasAdminDashboardStorageMigrationCompleted = () => {
+  if (typeof window === 'undefined') return false
+  return String(localStorage.getItem(getAdminDashboardStorageMigrationKey()) || '').trim() === '1'
+}
+
+const markAdminDashboardStorageMigrationCompleted = () => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(getAdminDashboardStorageMigrationKey(), '1')
+}
+
 const createNotificationDraftId = () => (
   `DRF-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 100000).toString().padStart(5, '0')}`
 )
@@ -1009,10 +1038,15 @@ const readAdminSentNotificationsFromStorage = () => {
   return source.map((notification, index) => normalizeSentNotification(notification, index))
 }
 
-const persistAdminSentNotificationsToStorage = (notifications = []) => {
+const persistAdminSentNotificationsToStorage = (notifications = [], { syncToBackend = true } = {}) => {
   const normalized = (Array.isArray(notifications) ? notifications : [])
     .map((notification, index) => normalizeSentNotification(notification, index))
   localStorage.setItem(ADMIN_SENT_NOTIFICATIONS_STORAGE_KEY, JSON.stringify(normalized))
+  if (syncToBackend) {
+    queueAdminDashboardStorageSync({
+      sentNotifications: normalized,
+    })
+  }
   emitAdminNotificationsSync()
 }
 
@@ -1049,11 +1083,16 @@ const readAdminNotificationDraftsFromStorage = () => {
     .sort((left, right) => (Date.parse(right.updatedAtIso || '') || 0) - (Date.parse(left.updatedAtIso || '') || 0))
 }
 
-const persistAdminNotificationDraftsToStorage = (drafts = []) => {
+const persistAdminNotificationDraftsToStorage = (drafts = [], { syncToBackend = true } = {}) => {
   const normalized = (Array.isArray(drafts) ? drafts : [])
     .map((draft) => normalizeNotificationDraft(draft))
     .sort((left, right) => (Date.parse(right.updatedAtIso || '') || 0) - (Date.parse(left.updatedAtIso || '') || 0))
   localStorage.setItem(ADMIN_NOTIFICATION_DRAFTS_STORAGE_KEY, JSON.stringify(normalized))
+  if (syncToBackend) {
+    queueAdminDashboardStorageSync({
+      notificationDrafts: normalized,
+    })
+  }
   emitAdminNotificationsSync()
 }
 
@@ -1119,11 +1158,16 @@ const readAdminScheduledNotificationsFromStorage = () => {
     .sort((left, right) => (Date.parse(left.scheduledForIso || '') || 0) - (Date.parse(right.scheduledForIso || '') || 0))
 }
 
-const persistAdminScheduledNotificationsToStorage = (entries = []) => {
+const persistAdminScheduledNotificationsToStorage = (entries = [], { syncToBackend = true } = {}) => {
   const normalized = (Array.isArray(entries) ? entries : [])
     .map((entry, index) => normalizeScheduledNotification(entry, index))
     .sort((left, right) => (Date.parse(left.scheduledForIso || '') || 0) - (Date.parse(right.scheduledForIso || '') || 0))
   localStorage.setItem(ADMIN_SCHEDULED_NOTIFICATIONS_STORAGE_KEY, JSON.stringify(normalized))
+  if (syncToBackend) {
+    queueAdminDashboardStorageSync({
+      scheduledNotifications: normalized,
+    })
+  }
   emitAdminNotificationsSync()
 }
 
@@ -1529,11 +1573,17 @@ const readAdminTrashEntriesFromStorage = () => {
     .sort((left, right) => (Date.parse(right.deletedAtIso || '') || 0) - (Date.parse(left.deletedAtIso || '') || 0))
 }
 
-const persistAdminTrashEntriesToStorage = (entries = []) => {
+const persistAdminTrashEntriesToStorage = (entries = [], { syncToBackend = true } = {}) => {
   const normalizedEntries = (Array.isArray(entries) ? entries : [])
     .map((entry, index) => normalizeAdminTrashEntry(entry, index))
     .sort((left, right) => (Date.parse(right.deletedAtIso || '') || 0) - (Date.parse(left.deletedAtIso || '') || 0))
   localStorage.setItem(ADMIN_TRASH_STORAGE_KEY, JSON.stringify(normalizedEntries))
+  if (syncToBackend) {
+    queueAdminDashboardStorageSync({
+      trashEntries: normalizedEntries,
+    })
+  }
+  emitAdminNotificationsSync()
 }
 
 const appendAdminTrashEntryToStorage = (entry = {}) => {
@@ -1556,6 +1606,198 @@ const removeAdminTrashEntryFromStorage = (entryId = '') => {
 
 const clearAdminTrashEntriesFromStorage = () => {
   localStorage.removeItem(ADMIN_TRASH_STORAGE_KEY)
+  queueAdminDashboardStorageSync({
+    trashEntries: [],
+  })
+  emitAdminNotificationsSync()
+}
+
+const readAdminDashboardStorageCollectionsFromLocal = () => ({
+  workSessions: getAdminWorkSessionsFromStorage(),
+  sentNotifications: readAdminSentNotificationsFromStorage(),
+  notificationDrafts: readAdminNotificationDraftsFromStorage(),
+  scheduledNotifications: readAdminScheduledNotificationsFromStorage(),
+  trashEntries: readAdminTrashEntriesFromStorage(),
+})
+
+const applyAdminDashboardStorageCollectionsToLocal = (dashboard = {}, { syncToBackend = false } = {}) => {
+  if (dashboard.workSessions !== undefined) {
+    writeAdminWorkSessionsToStorage(
+      Array.isArray(dashboard.workSessions) ? dashboard.workSessions : [],
+      { syncToBackend },
+    )
+  }
+  if (dashboard.sentNotifications !== undefined) {
+    persistAdminSentNotificationsToStorage(
+      Array.isArray(dashboard.sentNotifications) ? dashboard.sentNotifications : [],
+      { syncToBackend },
+    )
+  }
+  if (dashboard.notificationDrafts !== undefined) {
+    persistAdminNotificationDraftsToStorage(
+      Array.isArray(dashboard.notificationDrafts) ? dashboard.notificationDrafts : [],
+      { syncToBackend },
+    )
+  }
+  if (dashboard.scheduledNotifications !== undefined) {
+    persistAdminScheduledNotificationsToStorage(
+      Array.isArray(dashboard.scheduledNotifications) ? dashboard.scheduledNotifications : [],
+      { syncToBackend },
+    )
+  }
+  if (dashboard.trashEntries !== undefined) {
+    persistAdminTrashEntriesToStorage(
+      Array.isArray(dashboard.trashEntries) ? dashboard.trashEntries : [],
+      { syncToBackend },
+    )
+  }
+}
+
+const queueAdminDashboardStorageSync = (partialPayload = {}) => {
+  if (typeof window === 'undefined' || !isBackendAdminClientManagementEnabled()) return
+
+  const nextEntries = Object.entries(partialPayload || {})
+    .filter(([key, value]) => (
+      ['workSessions', 'sentNotifications', 'notificationDrafts', 'scheduledNotifications', 'trashEntries'].includes(key)
+      && Array.isArray(value)
+    ))
+
+  if (nextEntries.length === 0) return
+
+  pendingAdminDashboardStoragePatch = {
+    ...pendingAdminDashboardStoragePatch,
+    ...Object.fromEntries(nextEntries),
+  }
+
+  if (adminDashboardStorageSyncTimer) {
+    window.clearTimeout(adminDashboardStorageSyncTimer)
+  }
+
+  adminDashboardStorageSyncTimer = window.setTimeout(() => {
+    adminDashboardStorageSyncTimer = null
+    void flushAdminDashboardStorageSync()
+  }, ADMIN_DASHBOARD_STORAGE_SYNC_DEBOUNCE_MS)
+}
+
+const flushAdminDashboardStorageSync = async () => {
+  if (adminDashboardStorageSyncInFlight) return
+
+  const payload = pendingAdminDashboardStoragePatch
+  if (Object.keys(payload).length === 0) return
+
+  pendingAdminDashboardStoragePatch = {}
+  adminDashboardStorageSyncInFlight = true
+  let requestFailed = false
+
+  try {
+    const response = await apiFetch('/api/users/me/admin-dashboard', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const data = await response.json().catch(() => null)
+    if (!response.ok) {
+      requestFailed = true
+      pendingAdminDashboardStoragePatch = {
+        ...payload,
+        ...pendingAdminDashboardStoragePatch,
+      }
+      return
+    }
+
+    const dashboard = data?.dashboard && typeof data.dashboard === 'object' ? data.dashboard : null
+    if (dashboard) {
+      applyAdminDashboardStorageCollectionsToLocal(dashboard, { syncToBackend: false })
+    }
+    markAdminDashboardStorageMigrationCompleted()
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('kiamina:admin-dashboard-realtime-sync'))
+    }
+  } catch {
+    requestFailed = true
+    pendingAdminDashboardStoragePatch = {
+      ...payload,
+      ...pendingAdminDashboardStoragePatch,
+    }
+  } finally {
+    adminDashboardStorageSyncInFlight = false
+    if (!requestFailed && Object.keys(pendingAdminDashboardStoragePatch).length > 0) {
+      if (adminDashboardStorageSyncTimer) {
+        window.clearTimeout(adminDashboardStorageSyncTimer)
+      }
+      adminDashboardStorageSyncTimer = window.setTimeout(() => {
+        adminDashboardStorageSyncTimer = null
+        void flushAdminDashboardStorageSync()
+      }, ADMIN_DASHBOARD_STORAGE_SYNC_DEBOUNCE_MS)
+    }
+  }
+}
+
+const applyHydratedAdminDashboardCollections = ({
+  dashboard = {},
+  localCollections = {},
+  migrationCompleted = false,
+} = {}) => {
+  const resolvedDashboard = {}
+  const backfillPayload = {}
+  const fieldNames = [
+    'workSessions',
+    'sentNotifications',
+    'notificationDrafts',
+    'scheduledNotifications',
+    'trashEntries',
+  ]
+
+  fieldNames.forEach((fieldName) => {
+    const backendRows = Array.isArray(dashboard[fieldName]) ? dashboard[fieldName] : []
+    const localRows = Array.isArray(localCollections[fieldName]) ? localCollections[fieldName] : []
+
+    if (backendRows.length > 0 || migrationCompleted || localRows.length === 0) {
+      resolvedDashboard[fieldName] = backendRows
+      return
+    }
+
+    backfillPayload[fieldName] = localRows
+  })
+
+  applyAdminDashboardStorageCollectionsToLocal(resolvedDashboard, { syncToBackend: false })
+  return { backfillPayload }
+}
+
+const hydrateAdminDashboardStorageFromBackend = async () => {
+  if (typeof window === 'undefined' || !isBackendAdminClientManagementEnabled()) {
+    return { ok: false, skipped: true }
+  }
+
+  try {
+    const response = await apiFetch('/api/users/me/admin-dashboard', {
+      method: 'GET',
+    })
+    const data = await response.json().catch(() => null)
+    if (!response.ok || !data || typeof data !== 'object') {
+      return { ok: false, skipped: true }
+    }
+
+    const dashboard = data?.dashboard && typeof data.dashboard === 'object' ? data.dashboard : {}
+    const migrationCompleted = hasAdminDashboardStorageMigrationCompleted()
+    const localCollections = readAdminDashboardStorageCollectionsFromLocal()
+    const { backfillPayload } = applyHydratedAdminDashboardCollections({
+      dashboard,
+      localCollections,
+      migrationCompleted,
+    })
+
+    if (Object.keys(backfillPayload).length > 0) {
+      queueAdminDashboardStorageSync(backfillPayload)
+    } else {
+      markAdminDashboardStorageMigrationCompleted()
+    }
+
+    window.dispatchEvent(new Event('kiamina:admin-dashboard-realtime-sync'))
+    return { ok: true, dashboard }
+  } catch {
+    return { ok: false, skipped: true }
+  }
 }
 
 const normalizeComplianceStatus = (value, fallback = COMPLIANCE_STATUS.PENDING) => {
@@ -2493,11 +2735,13 @@ function AdminSidebar({
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener(ADMIN_NOTIFICATIONS_SYNC_EVENT, runProcessor)
+    window.addEventListener(ADMIN_NOTIFICATIONS_SYNC_EVENT, syncTrashStats)
     window.addEventListener('storage', handleStorage)
     return () => {
       unsubscribe()
       window.removeEventListener('storage', handleStorage)
       window.removeEventListener(ADMIN_NOTIFICATIONS_SYNC_EVENT, runProcessor)
+      window.removeEventListener(ADMIN_NOTIFICATIONS_SYNC_EVENT, syncTrashStats)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.clearInterval(processorIntervalId)
     }
@@ -9879,6 +10123,7 @@ function AdminActivityLogPage({ currentAdminAccount = null }) {
 
 export {
   canAccessAdminPage,
+  hydrateAdminDashboardStorageFromBackend,
   AdminSidebar,
   AdminTopBar,
   AdminDashboardPage,

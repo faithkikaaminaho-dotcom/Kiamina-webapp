@@ -41,11 +41,15 @@ import {
   readClientNotificationSettings,
 } from '../../../utils/clientNotificationPreferences'
 import { apiFetch } from '../../../utils/apiClient'
-import { buildFileCacheKey, putCachedFileBlob } from '../../../utils/fileCache'
+import {
+  cancelClientTeamInvite,
+  createClientTeamInvite,
+  fetchMyClientTeam,
+  removeClientTeamMember,
+  updateClientTeamMember,
+} from '../../../utils/clientTeamApi'
 
 const SETTINGS_REDIRECT_SECTION_KEY = 'kiaminaClientSettingsRedirectSection'
-const CLIENT_VERIFICATION_TOTAL_STEPS = 2
-// Previously `3` when the Dojah-powered identity step was active.
 // import { verifyIdentityWithDojah } from '../../../utils/dojahIdentity'
 // const GOVERNMENT_ID_TYPE_OPTIONS = ['NIN', "Voter's Card", 'International Passport', "Driver's Licence"]
 // const MIN_GOV_ID_FILE_SIZE_BYTES = 80 * 1024
@@ -341,9 +345,10 @@ function SettingsPage({
   settingsStorageKey,
   clientEmail = '',
   clientName = '',
-  verificationState = 'pending',
-  businessApprovedByAdmin = false,
   clientTeamRole = 'owner',
+  clientTeamOwnerEmail = '',
+  clientTeamOwnerName = '',
+  clientTeamAffiliation = null,
   initialSettingsProfile = {},
   initialVerificationDocs = {},
   initialAccountSettings = {},
@@ -593,20 +598,6 @@ function SettingsPage({
     const token = toTrimmedValue(seed).replace(/[^A-Za-z0-9]/g, '').slice(-6).toUpperCase()
     return token ? `CRI-${token}` : 'CRI-0000'
   }
-  const sanitizeFilenameSegment = (value = '', fallback = 'Client') => {
-    const cleaned = toTrimmedValue(value)
-      .replace(/[<>:"/\\|?*\u0000-\u001F]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-    return cleaned || fallback
-  }
-  const resolveFilenameExtension = (filename = '') => {
-    const normalized = toTrimmedValue(filename)
-    const extensionIndex = normalized.lastIndexOf('.')
-    if (extensionIndex <= 0 || extensionIndex === normalized.length - 1) return ''
-    const extensionToken = normalized.slice(extensionIndex + 1).replace(/[^A-Za-z0-9]/g, '').toLowerCase()
-    return extensionToken ? `.${extensionToken}` : ''
-  }
   const normalizeClientRole = (value = '') => {
     const normalized = toTrimmedValue(value).toLowerCase()
     if (normalized === 'manager') return 'manager'
@@ -623,6 +614,37 @@ function SettingsPage({
   }
   const normalizedTeamRole = normalizeClientRole(clientTeamRole)
   const canManageTeam = normalizedTeamRole === 'owner'
+  const isAffiliatedTeamMember = Boolean(clientTeamAffiliation?.isTeamMember)
+  const affiliatedWorkspaceSections = ['business-profile', 'tax-details']
+  const affiliatedWorkspaceFields = [
+    'businessType',
+    'businessName',
+    'country',
+    'currency',
+    'industry',
+    'industryOther',
+    'cacNumber',
+    'tin',
+    'reportingCycle',
+    'startMonth',
+  ]
+  const affiliatedWorkspaceOwnerName = toTrimmedValue(clientTeamAffiliation?.ownerName || clientTeamOwnerName) || 'the primary owner'
+  const affiliatedWorkspaceOwnerEmail = toTrimmedValue(clientTeamAffiliation?.ownerEmail || clientTeamOwnerEmail).toLowerCase()
+  const affiliatedWorkspaceName = toTrimmedValue(clientTeamAffiliation?.companyName || formData.businessName) || 'this company workspace'
+  const teamWorkspaceDisplayValues = isAffiliatedTeamMember
+    ? {
+        businessType: toTrimmedValue(clientTeamAffiliation?.businessType || formData.businessType),
+        businessName: toTrimmedValue(clientTeamAffiliation?.companyName || formData.businessName),
+        country: toTrimmedValue(clientTeamAffiliation?.country || formData.country),
+        currency: toTrimmedValue(clientTeamAffiliation?.currency || formData.currency),
+        industry: toTrimmedValue(clientTeamAffiliation?.industry || formData.industry),
+        industryOther: toTrimmedValue(clientTeamAffiliation?.industryOther || formData.industryOther),
+        cacNumber: toTrimmedValue(clientTeamAffiliation?.cacNumber || formData.cacNumber),
+        tin: toTrimmedValue(clientTeamAffiliation?.tin || formData.tin),
+        reportingCycle: toTrimmedValue(clientTeamAffiliation?.reportingCycle || formData.reportingCycle),
+        startMonth: toTrimmedValue(clientTeamAffiliation?.startMonth || formData.startMonth),
+      }
+    : null
 
   const toIsoDateOrNow = (value = '') => {
     const parsed = Date.parse(value || '')
@@ -686,7 +708,6 @@ function SettingsPage({
       isPrimaryOwner: normalizedRole === 'owner' || Boolean(member?.isPrimaryOwner),
     }
   }
-  const buildInviteToken = () => `CINV-${Date.now()}-${Math.random().toString(36).slice(2, 12).toUpperCase()}`
   const buildCompanyId = (seed = '') => {
     const normalized = toTrimmedValue(seed).toLowerCase().replace(/[^a-z0-9]/g, '')
     if (!normalized) return 'CMP-LOCAL-0001'
@@ -695,15 +716,8 @@ function SettingsPage({
 
   const resolvedClientEmail = toTrimmedValue(clientEmail || formData.email || scopedStorageSuffix).toLowerCase()
   const resolvedClientCri = normalizeCriValue(formData.cri || draftData.cri) || resolveFallbackCri(resolvedClientEmail || formData.businessName)
-  const resolvedClientDisplayName = sanitizeFilenameSegment(
-    buildClientFullName(formData) || clientName || formData.businessName || resolvedClientEmail.split('@')[0],
-    'Client',
-  )
-  const buildBusinessVerificationDocumentFilename = (sourceFilename = '') => (
-    `${resolvedClientDisplayName} ${resolvedClientCri} Business Verification Document${resolveFilenameExtension(sourceFilename)}`
-  )
   const companyId = buildCompanyId(resolvedClientEmail || formData.businessName)
-  const ownerDisplayName = toTrimmedValue(clientName || buildClientFullName(formData) || 'Primary Owner')
+  const ownerDisplayName = toTrimmedValue(buildClientFullName(formData) || clientName || 'Primary Owner')
   const ownerMemberId = `TM-OWNER-${companyId}`
   const ownerFallbackEmail = resolvedClientEmail || 'owner@company.local'
   const ownerFallbackName = ownerDisplayName || 'Primary Owner'
@@ -731,6 +745,17 @@ function SettingsPage({
       .map((invite) => normalizeInviteRecord(invite, companyId))
       .filter((invite) => invite.email && invite.token)
   })
+  const [isTeamSyncing, setIsTeamSyncing] = useState(false)
+  const applyBackendTeamState = (payload = {}) => {
+    const normalizedMembers = (Array.isArray(payload?.members) ? payload.members : [])
+      .map((member) => normalizeTeamMemberRecord(member, companyId))
+      .filter(Boolean)
+    const normalizedInvites = (Array.isArray(payload?.invites) ? payload.invites : [])
+      .map((invite) => normalizeInviteRecord(invite, companyId))
+      .filter((invite) => invite.email && invite.token)
+    setTeamMembers(normalizedMembers.length > 0 ? normalizedMembers : (initialOwnerMember ? [initialOwnerMember] : []))
+    setTeamInvites(normalizedInvites)
+  }
 
   const normalizedProfileForVerification = {
     fullName: buildClientFullName(formData),
@@ -826,37 +851,13 @@ function SettingsPage({
   const lastAppliedAccountSettingsSyncSignatureRef = useRef('')
   const initialNotificationSettingsSyncSignature = `${String(clientEmail || '').trim().toLowerCase()}::${JSON.stringify(normalizeClientNotificationSettings(initialNotificationSettings))}`
   const lastAppliedNotificationSettingsSyncSignatureRef = useRef('')
-  const normalizedBusinessType = toTrimmedValue(formData.businessType).toLowerCase()
-  const isIndividualBusinessType = normalizedBusinessType === 'individual'
   const profileStepCompleted = Boolean(
     normalizedProfileForVerification.fullName
     && normalizedProfileForVerification.email
     && normalizedProfileForVerification.phone
     && normalizedProfileForVerification.address,
   )
-  const businessVerificationDocumentReady = isIndividualBusinessType || Boolean(toTrimmedValue(verificationDocs.businessReg))
-  const normalizedVerificationState = toTrimmedValue(verificationState).toLowerCase()
-  const verificationApprovedByAdmin = (
-    normalizedVerificationState === 'verified'
-    || normalizedVerificationState.includes('fully')
-    || normalizedVerificationState.includes('approved')
-    || normalizedVerificationState.includes('compliant')
-  )
-  const finalBusinessApproval = isIndividualBusinessType || Boolean(businessApprovedByAdmin || verificationApprovedByAdmin)
-  const businessVerified = isIndividualBusinessType || Boolean(businessVerificationDocumentReady && finalBusinessApproval)
-  const businessVerificationSubmissionStatus = toTrimmedValue(verificationDocs.businessRegVerificationStatus).toLowerCase()
-  const businessVerificationSubmitted = (
-    !isIndividualBusinessType
-    && businessVerificationSubmissionStatus === 'submitted'
-  )
-  const businessStepStatusLabel = isIndividualBusinessType
-    ? 'Auto Verified'
-    : businessVerified
-      ? 'Approved'
-      : businessVerificationSubmitted
-        ? 'Submitted - Awaiting Approval'
-        : 'Pending'
-  const businessLockedForClient = Boolean(!isIndividualBusinessType && businessVerified)
+  const businessVerificationNotice = 'Business verification is turned off for the MVP. You can continue without uploads or approval.'
   /*
   const identityDocumentCaptured = Boolean(
     toTrimmedValue(verificationDocs.govId)
@@ -870,16 +871,8 @@ function SettingsPage({
   const identityVerified = Boolean(identityVerifiedByAutomation)
   const canStartBusinessVerification = Boolean(identityVerified)
   */
-  const verificationStepsCompleted = Number(profileStepCompleted) + Number(businessVerified)
-  const verificationProgress = Math.round((verificationStepsCompleted / CLIENT_VERIFICATION_TOTAL_STEPS) * 100)
-  const nextVerificationSection = !profileStepCompleted
-    ? 'user-profile'
-    : (!businessVerified ? 'business-profile' : 'team-management')
-  const clientVerificationStatus = verificationStepsCompleted === CLIENT_VERIFICATION_TOTAL_STEPS && finalBusinessApproval
-    ? 'Fully Verified'
-    : 'Pending Verification'
-  const teamInviteUnlocked = clientVerificationStatus === 'Fully Verified'
-  const verificationRatioLabel = `${verificationStepsCompleted}/${CLIENT_VERIFICATION_TOTAL_STEPS}`
+  const nextVerificationSection = 'user-profile'
+  const teamInviteUnlocked = true
   const activePendingInvites = teamInvites.filter((invite) => getInviteStatus(invite) === 'Pending')
   const hasNotificationChanges = CLIENT_NOTIFICATION_EDITABLE_KEYS.some((key) => (
     Boolean(notificationDraft[key]) !== Boolean(notifications[key])
@@ -1064,6 +1057,27 @@ function SettingsPage({
   }, [companyId, ownerDisplayName, ownerFallbackEmail, ownerFallbackName, ownerMemberId, resolvedClientEmail])
 
   useEffect(() => {
+    let isCancelled = false
+    if (!resolvedClientEmail) return () => {
+      isCancelled = true
+    }
+
+    setIsTeamSyncing(true)
+    ;(async () => {
+      const response = await fetchMyClientTeam()
+      if (isCancelled) return
+      if (response.ok && response.data && typeof response.data === 'object') {
+        applyBackendTeamState(response.data)
+      }
+      setIsTeamSyncing(false)
+    })()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [resolvedClientEmail])
+
+  useEffect(() => {
     writeLegacyJson(teamMembersKey, teamMembers)
   }, [teamMembers, teamMembersKey])
 
@@ -1131,10 +1145,17 @@ function SettingsPage({
     ) {
       return false
     }
+    if (isAffiliatedTeamMember && affiliatedWorkspaceFields.includes(field)) {
+      return true
+    }
     return Boolean(lockedAdminFields[field]) || isComplianceLocked(field)
   }
 
   const showLockedFieldToast = () => {
+    if (isAffiliatedTeamMember) {
+      showToast('error', `These workspace details are inherited from ${affiliatedWorkspaceName} and can only be changed by ${affiliatedWorkspaceOwnerName}.`)
+      return
+    }
     showToast('error', 'This information is system-controlled and cannot be edited. To change this information, please contact support.')
   }
 
@@ -1151,11 +1172,6 @@ function SettingsPage({
     if (verificationLockEnforced && normalizedSection !== 'user-profile') {
       showToast('error', 'Verify your account before accessing other settings sections.')
       setActiveSection('user-profile')
-      return
-    }
-    if (normalizedSection === 'team-management' && !teamInviteUnlocked) {
-      showToast('error', 'Team Management unlocks only after full verification (2/2).')
-      setActiveSection(nextVerificationSection)
       return
     }
     setActiveSection(normalizedSection)
@@ -1229,6 +1245,10 @@ function SettingsPage({
   }
 
   const startSectionEdit = (section) => {
+    if (isAffiliatedTeamMember && affiliatedWorkspaceSections.includes(section)) {
+      showLockedFieldToast()
+      return
+    }
     setDraftData(formData)
     setErrors({})
     setEditMode(prev => ({ ...prev, [section]: true }))
@@ -1517,35 +1537,6 @@ function SettingsPage({
   })
   */
 
-  const handleSubmitBusinessVerification = () => {
-    if (isIndividualBusinessType) {
-      showToast('success', 'Business verification step is automatically completed for Individual accounts.')
-      return
-    }
-    if (businessLockedForClient) {
-      showToast('success', 'Business verification is already approved and locked.')
-      return
-    }
-    if (!verificationDocs.businessReg) {
-      showToast('error', 'Business registration document is required.')
-      return
-    }
-    if (businessVerificationSubmitted) {
-      showToast('success', 'Submitted. Awaiting approval.')
-      return
-    }
-    setVerificationDocs((prev) => {
-      const next = {
-        ...prev,
-        businessRegVerificationStatus: 'submitted',
-        businessRegSubmittedAt: new Date().toISOString(),
-      }
-      writeLegacyJson(verificationDocsKey, next)
-      return next
-    })
-    showToast('success', 'Submitted. Awaiting approval.')
-  }
-
   const handleSaveBusiness = async () => {
     const requiresRegistrationNumber = draftData.businessType === 'Business' || draftData.businessType === 'Non-Profit'
     const lockableFields = requiresRegistrationNumber ? ['cacNumber', 'businessName'] : ['businessName']
@@ -1635,53 +1626,8 @@ function SettingsPage({
     }
     */
 
-    if (docType === 'businessReg' && isIndividualBusinessType) {
-      showToast('error', 'Business registration document is not required for Individual business type.')
-      resetInput()
-      return
-    }
-    if (docType === 'businessReg' && businessLockedForClient) {
-      showToast('error', 'Business verification is approved and locked. Contact admin for changes.')
-      resetInput()
-      return
-    }
-
     if (docType === 'businessReg') {
-      const renamedBusinessRegFilename = buildBusinessVerificationDocumentFilename(file.name)
-      const fileId = `BIZREG-${Date.now()}-${Math.floor(Math.random() * 1000)}`
-      const fileCacheKey = buildFileCacheKey({
-        ownerEmail: resolvedClientEmail || formData.email || scopedStorageSuffix,
-        fileId,
-      })
-      if (!fileCacheKey) {
-        showToast('error', 'Unable to save this document reference.')
-        resetInput()
-        return
-      }
-      const cached = await putCachedFileBlob(fileCacheKey, file, {
-        filename: renamedBusinessRegFilename,
-        mimeType: file.type,
-        size: file.size,
-      })
-      if (!cached) {
-        showToast('error', 'Unable to store this document. Try again.')
-        resetInput()
-        return
-      }
-      setVerificationDocs((prev) => {
-        const next = {
-          ...prev,
-          businessReg: renamedBusinessRegFilename,
-          businessRegFileCacheKey: fileCacheKey,
-          businessRegMimeType: String(file.type || 'application/octet-stream').trim(),
-          businessRegSize: Number(file.size || 0),
-          businessRegUploadedAt: new Date().toISOString(),
-          businessRegVerificationStatus: '',
-          businessRegSubmittedAt: '',
-        }
-        writeLegacyJson(verificationDocsKey, next)
-        return next
-      })
+      showToast('success', businessVerificationNotice)
       resetInput()
       return
     }
@@ -1782,7 +1728,8 @@ function SettingsPage({
     if (!token) return ''
     const encodedToken = encodeURIComponent(token)
     const encodedCompanyId = encodeURIComponent(toTrimmedValue(invite?.companyId || companyId))
-    return `${window.location.origin}/team/setup?invite=${encodedToken}&company=${encodedCompanyId}`
+    const encodedEmail = encodeURIComponent(toTrimmedValue(invite?.email).toLowerCase())
+    return `${window.location.origin}/team/setup?invite=${encodedToken}&company=${encodedCompanyId}&email=${encodedEmail}`
   }
 
   const handleOpenInviteModal = () => {
@@ -1790,22 +1737,14 @@ function SettingsPage({
       showToast('error', 'Only the primary account owner can invite team members.')
       return
     }
-    if (!teamInviteUnlocked) {
-      showToast('error', 'Complete all 3 verification steps before inviting team members.')
-      return
-    }
     setGeneratedInviteLink('')
     setInviteForm({ email: '', role: 'manager' })
     setIsInviteModalOpen(true)
   }
 
-  const handleCreateInvite = () => {
+  const handleCreateInvite = async () => {
     if (!canManageTeam) {
       showToast('error', 'Only the primary account owner can invite team members.')
-      return
-    }
-    if (!teamInviteUnlocked) {
-      showToast('error', 'Complete all 3 verification steps before inviting team members.')
       return
     }
 
@@ -1832,23 +1771,30 @@ function SettingsPage({
       return
     }
 
-    const inviteRecord = normalizeInviteRecord({
-      id: `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    setIsTeamSyncing(true)
+    const response = await createClientTeamInvite({
       email: normalizedEmail,
       role: normalizedRole,
-      invitedBy: ownerDisplayName,
-      companyId,
-      token: buildInviteToken(),
-      expiresAt: new Date(Date.now() + (48 * 60 * 60 * 1000)).toISOString(),
-      status: 'Pending',
-      createdAt: new Date().toISOString(),
-      singleUse: true,
-    }, companyId)
+      inviteBaseUrl: window.location.origin,
+    })
+    setIsTeamSyncing(false)
+    if (!response.ok || !response.data || typeof response.data !== 'object') {
+      showToast('error', response.data?.message || 'Unable to create the invite right now.')
+      return
+    }
 
-    setTeamInvites((previous) => [inviteRecord, ...previous])
-    const inviteLink = getInviteLink(inviteRecord)
+    applyBackendTeamState(response.data)
+    const inviteRecord = normalizeInviteRecord(response.data?.invite || {}, companyId)
+    const inviteLink = String(response.data?.inviteUrl || getInviteLink(inviteRecord)).trim()
     setGeneratedInviteLink(inviteLink)
-    showToast('success', 'Invite created. Link expires in 48 hours and can be used once.')
+    showToast(
+      response.data?.emailQueued === false
+        ? 'success'
+        : 'success',
+      response.data?.emailQueued === false
+        ? 'Invite created. Email delivery could not be confirmed, so copy the link and send it manually if needed.'
+        : 'Invite created and emailed. Link expires in 48 hours and can be used once.',
+    )
   }
 
   const handleCopyInviteLink = async (invite = null) => {
@@ -1865,29 +1811,25 @@ function SettingsPage({
     }
   }
 
-  const handleCancelInvite = (inviteId = '') => {
+  const handleCancelInvite = async (inviteId = '') => {
     if (!canManageTeam) {
       showToast('error', 'Only the primary account owner can cancel invites.')
       return
     }
     const normalizedId = toTrimmedValue(inviteId)
     if (!normalizedId) return
-    setTeamInvites((previous) => (
-      previous.map((invite) => {
-        if (invite.id !== normalizedId) return invite
-        if (getInviteStatus(invite) !== 'Pending') return invite
-        return {
-          ...invite,
-          status: 'Cancelled',
-          cancelledAt: new Date().toISOString(),
-          reason: 'owner-cancelled',
-        }
-      })
-    ))
+    setIsTeamSyncing(true)
+    const response = await cancelClientTeamInvite({ inviteId: normalizedId })
+    setIsTeamSyncing(false)
+    if (!response.ok || !response.data || typeof response.data !== 'object') {
+      showToast('error', response.data?.message || 'Unable to cancel invite right now.')
+      return
+    }
+    applyBackendTeamState(response.data)
     showToast('success', 'Invite cancelled.')
   }
 
-  const handleTeamRoleChange = (memberId = '', nextRole = '') => {
+  const handleTeamRoleChange = async (memberId = '', nextRole = '') => {
     if (!canManageTeam) {
       showToast('error', 'Only the primary account owner can change team roles.')
       return
@@ -1895,31 +1837,35 @@ function SettingsPage({
     const normalizedId = toTrimmedValue(memberId)
     if (!normalizedId) return
     const normalizedRole = normalizeClientRole(nextRole)
-    setTeamMembers((previous) => (
-      previous.map((member) => {
-        if (member.id !== normalizedId) return member
-        if (member.isPrimaryOwner) return member
-        return {
-          ...member,
-          role: normalizedRole,
-        }
-      })
-    ))
+    setIsTeamSyncing(true)
+    const response = await updateClientTeamMember({
+      memberId: normalizedId,
+      role: normalizedRole,
+    })
+    setIsTeamSyncing(false)
+    if (!response.ok || !response.data || typeof response.data !== 'object') {
+      showToast('error', response.data?.message || 'Unable to update team role right now.')
+      return
+    }
+    applyBackendTeamState(response.data)
     showToast('success', 'Team role updated.')
   }
 
-  const handleRemoveTeamMember = (memberId = '') => {
+  const handleRemoveTeamMember = async (memberId = '') => {
     if (!canManageTeam) {
       showToast('error', 'Only the primary account owner can remove team members.')
       return
     }
     const normalizedId = toTrimmedValue(memberId)
     if (!normalizedId) return
-    setTeamMembers((previous) => {
-      const target = previous.find((member) => member.id === normalizedId)
-      if (!target || target.isPrimaryOwner) return previous
-      return previous.filter((member) => member.id !== normalizedId)
-    })
+    setIsTeamSyncing(true)
+    const response = await removeClientTeamMember({ memberId: normalizedId })
+    setIsTeamSyncing(false)
+    if (!response.ok || !response.data || typeof response.data !== 'object') {
+      showToast('error', response.data?.message || 'Unable to remove team member right now.')
+      return
+    }
+    applyBackendTeamState(response.data)
     showToast('success', 'Team member removed.')
   }
 
@@ -2869,30 +2815,22 @@ function SettingsPage({
             <div className="rounded-lg border border-border-light bg-background/40 p-4">
               <h3 className="text-lg font-semibold text-text-primary">Identity Verification Removed</h3>
               <p className="text-sm text-text-secondary mt-1">
-                Identity verification is currently unavailable. Continue with your business verification document under Business Profile.
+                Identity and business verification are both disabled for the MVP. Continue with your profile and workspace settings.
               </p>
             </div>
             <button
               type="button"
-              onClick={() => setActiveSection('business-profile')}
+              onClick={() => setActiveSection('user-profile')}
               className="h-9 px-4 rounded-md bg-primary text-white text-sm font-medium hover:bg-primary-light transition-colors"
             >
-              Open Business Profile
+              Open User Profile
             </button>
           </div>
         )
       }
 
       case 'team-management': {
-        const inviteButtonDisabled = !teamInviteUnlocked || !canManageTeam
-        const progressLabel = `${verificationRatioLabel} verification steps completed.`
-        const verificationMessage = verificationStepsCompleted === 0
-          ? 'Complete your user profile and business verification to invite team members.'
-          : businessVerificationSubmitted && !businessVerified
-            ? 'Business verification is submitted and awaiting admin approval before invite access can be enabled.'
-          : verificationStepsCompleted < CLIENT_VERIFICATION_TOTAL_STEPS
-            ? 'Invite access remains locked until your profile and business verification are completed and approved.'
-            : 'Awaiting final compliance approval before invite access can be enabled.'
+        const inviteButtonDisabled = !canManageTeam || isTeamSyncing
         const sortedTeamMembers = [...teamMembers].sort((left, right) => {
           if (left.isPrimaryOwner && !right.isPrimaryOwner) return -1
           if (!left.isPrimaryOwner && right.isPrimaryOwner) return 1
@@ -2908,6 +2846,7 @@ function SettingsPage({
               <div>
                 <h3 className="text-lg font-semibold text-text-primary mb-1">Team Management</h3>
                 <p className="text-sm text-text-muted">Manage collaboration access for your company workspace.</p>
+                {isTeamSyncing ? <p className="text-xs text-text-muted mt-1">Syncing team changes...</p> : null}
               </div>
               <button
                 type="button"
@@ -2925,48 +2864,26 @@ function SettingsPage({
             </div>
 
             <div className={`rounded-lg border p-4 ${teamInviteUnlocked ? 'border-success/20 bg-success-bg/40' : 'border-border-light bg-background/40'}`}>
-              {teamInviteUnlocked ? (
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="w-5 h-5 text-success mt-0.5" />
-                  <div>
-                    <p className="text-sm font-semibold text-text-primary">Fully Verified</p>
-                    <p className="text-sm text-text-secondary mt-1">Team collaboration is unlocked. You can now invite team members.</p>
-                  </div>
+              <div className="flex items-start gap-3">
+                <CheckCircle className="w-5 h-5 text-success mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">Team Collaboration Enabled</p>
+                  <p className="text-sm text-text-secondary mt-1">
+                    Team invites are available in the MVP without identity or business verification.
+                  </p>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-warning mt-0.5" />
-                    <div>
-                      <p className="text-sm font-semibold text-text-primary">Team Access Locked</p>
-                      <p className="text-sm text-text-secondary mt-1">{verificationMessage}</p>
-                      <p className="text-xs text-text-muted mt-1">{progressLabel}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="h-2 w-full rounded-full bg-white border border-border-light overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all"
-                        style={{ width: `${verificationProgress}%` }}
-                      />
-                    </div>
-                    <div className="flex flex-wrap items-center justify-between text-xs text-text-muted gap-2">
-                      <span>User Profile Verified: {profileStepCompleted ? 'Yes' : 'No'}</span>
-                      <span>Business Verified: {businessVerified ? 'Yes' : 'No'}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => setActiveSection(nextVerificationSection)}
-                      className="h-9 px-4 rounded-md bg-primary text-white text-sm font-medium hover:bg-primary-light transition-colors"
-                    >
-                      Complete Verification
-                    </button>
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
+
+            {isAffiliatedTeamMember && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <p className="text-sm font-semibold text-text-primary">Affiliated Team Member</p>
+                <p className="text-sm text-text-secondary mt-1">
+                  This account is attached to {affiliatedWorkspaceName} and managed by {affiliatedWorkspaceOwnerName}
+                  {affiliatedWorkspaceOwnerEmail ? ` (${affiliatedWorkspaceOwnerEmail})` : ''}.
+                </p>
+              </div>
+            )}
 
             {!canManageTeam && (
               <div className="rounded-lg border border-warning/30 bg-warning-bg/40 p-4">
@@ -3009,7 +2926,7 @@ function SettingsPage({
                             <select
                               value={member.role}
                               onChange={(e) => handleTeamRoleChange(member.id, e.target.value)}
-                              disabled={!canManageTeam}
+                              disabled={!canManageTeam || isTeamSyncing}
                               className="h-8 px-2.5 border border-border rounded text-xs text-text-primary focus:outline-none focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <option value="manager">Manager</option>
@@ -3019,7 +2936,7 @@ function SettingsPage({
                             <button
                               type="button"
                               onClick={() => handleRemoveTeamMember(member.id)}
-                              disabled={!canManageTeam}
+                              disabled={!canManageTeam || isTeamSyncing}
                               className="h-8 px-2.5 rounded border border-border text-xs font-medium text-text-primary hover:bg-background disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -3075,7 +2992,7 @@ function SettingsPage({
                           <button
                             type="button"
                             onClick={() => handleCancelInvite(invite.id)}
-                            disabled={!isPending || !canManageTeam}
+                            disabled={!isPending || !canManageTeam || isTeamSyncing}
                             className="h-8 px-2.5 rounded border border-border text-xs font-medium text-text-primary hover:bg-background disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -3094,12 +3011,20 @@ function SettingsPage({
 
       case 'business-profile': {
         const isBusinessEditMode = editMode['business-profile']
+        const businessSectionLockedForTeamMember = isAffiliatedTeamMember
+        const readonlyBusinessType = teamWorkspaceDisplayValues?.businessType || formData.businessType
+        const readonlyBusinessName = teamWorkspaceDisplayValues?.businessName || formData.businessName
+        const readonlyBusinessCountry = teamWorkspaceDisplayValues?.country || formData.country
+        const readonlyBusinessCurrency = teamWorkspaceDisplayValues?.currency || formData.currency
+        const readonlyIndustry = teamWorkspaceDisplayValues?.industry || formData.industry
+        const readonlyIndustryOther = teamWorkspaceDisplayValues?.industryOther || formData.industryOther
+        const readonlyCacNumber = teamWorkspaceDisplayValues?.cacNumber || formData.cacNumber
         const businessTypeLocked = isFieldLocked('businessType')
         const cacLocked = isFieldLocked('cacNumber')
         const businessNameLocked = isFieldLocked('businessName')
         const countryLocked = isFieldLocked('country')
         const needsCac = draftData.businessType === 'Business' || draftData.businessType === 'Non-Profit'
-        const isNigeriaRegistration = (draftData.country || formData.country || '').trim().toLowerCase() === 'nigeria' || !(draftData.country || formData.country)
+        const isNigeriaRegistration = (draftData.country || readonlyBusinessCountry || '').trim().toLowerCase() === 'nigeria' || !(draftData.country || readonlyBusinessCountry)
         const registrationNumberLabel = isNigeriaRegistration ? 'CAC Registration Number' : 'Business Registration Number'
         const registrationNumberPlaceholder = isNigeriaRegistration ? 'e.g., BN123456, RC123456, or IT123456' : 'e.g., BR123456'
 
@@ -3113,13 +3038,25 @@ function SettingsPage({
               </div>
               <button
                 onClick={() => isBusinessEditMode ? cancelSectionEdit('business-profile') : startSectionEdit('business-profile')}
+                disabled={businessSectionLockedForTeamMember}
                 className={`h-9 px-4 rounded-md text-sm font-medium transition-colors ${
-                  isBusinessEditMode ? 'bg-error-bg text-error hover:bg-error/10' : 'bg-primary text-white hover:bg-primary-light'
+                  businessSectionLockedForTeamMember
+                    ? 'bg-gray-100 text-text-muted cursor-not-allowed'
+                    : (isBusinessEditMode ? 'bg-error-bg text-error hover:bg-error/10' : 'bg-primary text-white hover:bg-primary-light')
                 }`}
               >
-                {isBusinessEditMode ? 'Cancel Edit' : 'Edit'}
+                {businessSectionLockedForTeamMember ? 'Owner Controlled' : (isBusinessEditMode ? 'Cancel Edit' : 'Edit')}
               </button>
             </div>
+
+            {businessSectionLockedForTeamMember && (
+              <div className="rounded-md border border-primary/20 bg-primary/5 px-4 py-3">
+                <p className="text-sm font-semibold text-text-primary">Inherited Business Profile</p>
+                <p className="text-sm text-text-secondary mt-1">
+                  Business details for {affiliatedWorkspaceName} are inherited from {affiliatedWorkspaceOwnerName} and remain read-only here.
+                </p>
+              </div>
+            )}
 
             {!isBusinessEditMode ? (
               <>
@@ -3131,38 +3068,24 @@ function SettingsPage({
                   <div className="mt-1 text-sm font-medium text-text-primary">{resolvedClientCri}</div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {renderReadonlyField('Business Type', formData.businessType, true)}
-                  {(formData.businessType === 'Business' || formData.businessType === 'Non-Profit') && renderReadonlyField(
-                    ((formData.country || '').trim().toLowerCase() === 'nigeria' || !formData.country) ? 'CAC Registration Number' : 'Business Registration Number',
-                    formData.cacNumber,
+                  {renderReadonlyField('Business Type', readonlyBusinessType, true)}
+                  {(readonlyBusinessType === 'Business' || readonlyBusinessType === 'Non-Profit' || readonlyBusinessType === 'business' || readonlyBusinessType === 'non-profit') && renderReadonlyField(
+                    ((readonlyBusinessCountry || '').trim().toLowerCase() === 'nigeria' || !readonlyBusinessCountry) ? 'CAC Registration Number' : 'Business Registration Number',
+                    readonlyCacNumber,
                     true
                   )}
-                  {renderReadonlyField('Business Name', formData.businessName, true)}
-                  {renderReadonlyField('Country of Registration', formData.country, true)}
-                  {renderReadonlyField('Base Currency', formData.currency, true)}
+                  {renderReadonlyField('Business Name', readonlyBusinessName, true)}
+                  {renderReadonlyField('Country of Registration', readonlyBusinessCountry, true)}
+                  {renderReadonlyField('Base Currency', readonlyBusinessCurrency, true)}
                   {renderReadonlyField('Account Language', formData.language, true)}
-                  {renderReadonlyField('Industry', formData.industry, true)}
-                  {formData.industry === 'Others' && renderReadonlyField('Please Specify Your Industry', formData.industryOther, true)}
+                  {renderReadonlyField('Industry', readonlyIndustry, true)}
+                  {readonlyIndustry === 'Others' && renderReadonlyField('Please Specify Your Industry', readonlyIndustryOther, true)}
                 </div>
                 <div className="border border-border rounded-lg p-4">
                   <h4 className="text-sm font-semibold text-text-primary mb-4">Business Verification</h4>
-                  {isIndividualBusinessType ? (
-                    <div className="rounded-md border border-success/30 bg-success-bg/40 px-3 py-2.5 text-sm text-text-secondary">
-                      Business verification is auto approved for Individual accounts. No business registration upload is required.
-                    </div>
-                  ) : businessLockedForClient ? (
-                    <div className="rounded-md border border-success/30 bg-success-bg/40 px-3 py-2.5 text-sm text-text-secondary">
-                      Business verification is approved and locked.
-                    </div>
-                  ) : businessVerificationSubmitted ? (
-                    <div className="rounded-md border border-primary/30 bg-info-bg/40 px-3 py-2.5 text-sm text-text-secondary">
-                      Submitted. Awaiting approval.
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 gap-4">
-                      {renderReadonlyField('Business Registration Document', verificationDocs.businessReg, true)}
-                    </div>
-                  )}
+                  <div className="rounded-md border border-primary/20 bg-primary-tint/40 px-3 py-2.5 text-sm text-text-secondary">
+                    {businessVerificationNotice}
+                  </div>
                 </div>
                 <div className="border border-border rounded-lg p-4">
                   <h4 className="text-sm font-semibold text-text-primary mb-4">Company Branding</h4>
@@ -3367,49 +3290,9 @@ function SettingsPage({
 
                 <div className="border border-border rounded-lg p-4">
                   <h4 className="text-sm font-semibold text-text-primary mb-4">Business Verification</h4>
-                  {isIndividualBusinessType ? (
-                    <div className="rounded-md border border-success/30 bg-success-bg/40 px-3 py-2.5 text-sm text-text-secondary">
-                      Business verification is auto approved for Individual accounts. No business registration upload is required.
-                    </div>
-                  ) : (
-                    <>
-                      {businessVerificationSubmitted && !businessLockedForClient && (
-                        <div className="mb-3 rounded-md border border-primary/30 bg-info-bg/40 px-3 py-2.5 text-sm text-text-secondary">
-                          Submitted. Awaiting approval.
-                        </div>
-                      )}
-                      <div className={`border-2 border-dashed border-border rounded-lg p-4 text-center transition-colors ${businessLockedForClient ? 'bg-background/50 cursor-not-allowed' : 'hover:border-primary cursor-pointer'}`} onClick={() => { if (businessLockedForClient) return; const input = document.querySelector('#verification-upload-businessReg'); if (input) input.click() }}>
-                        <UploadCloud className="w-8 h-8 mx-auto mb-2 text-text-muted" />
-                        <p className="text-sm text-text-primary mb-1">{businessLockedForClient ? 'Business verification is locked' : 'Upload business registration document'}</p>
-                        <input
-                          type="file"
-                          id="verification-upload-businessReg"
-                          className="hidden"
-                          onChange={(e) => { handleFileUpload('businessReg', e) }}
-                          disabled={businessLockedForClient}
-                        />
-                        <p className="text-xs text-text-muted">All file types supported.</p>
-                      </div>
-                    </>
-                  )}
-                  {!isIndividualBusinessType && verificationDocs.businessReg && (
-                    <p className="text-xs text-success mt-2">Uploaded: {verificationDocs.businessReg}</p>
-                  )}
-                  {!isIndividualBusinessType && (
-                    <div className="pt-4">
-                      <button
-                        disabled={businessLockedForClient || businessVerificationSubmitted}
-                        onClick={handleSubmitBusinessVerification}
-                        className="h-9 px-4 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-light transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {businessLockedForClient
-                          ? 'Business Verification Approved'
-                          : businessVerificationSubmitted
-                            ? 'Submitted - Awaiting Approval'
-                            : 'Submit Business Verification'}
-                      </button>
-                    </div>
-                  )}
+                  <div className="rounded-md border border-primary/20 bg-primary-tint/40 px-3 py-3 text-sm text-text-secondary">
+                    {businessVerificationNotice}
+                  </div>
                 </div>
 
                 <div className="pt-4">
@@ -3428,9 +3311,13 @@ function SettingsPage({
 
       case 'tax-details': {
         const isTaxEditMode = editMode['tax-details']
+        const taxSectionLockedForTeamMember = isAffiliatedTeamMember
         const tinLocked = isFieldLocked('tin')
-        const financialYearEndDisplay = formatFinancialBoundaryDisplay(formData.reportingCycle, 'end')
-        const financialYearStartDisplay = formatFinancialBoundaryDisplay(formData.startMonth, 'start')
+        const readonlyTin = teamWorkspaceDisplayValues?.tin || formData.tin
+        const readonlyReportingCycle = teamWorkspaceDisplayValues?.reportingCycle || formData.reportingCycle
+        const readonlyStartMonth = teamWorkspaceDisplayValues?.startMonth || formData.startMonth
+        const financialYearEndDisplay = formatFinancialBoundaryDisplay(readonlyReportingCycle, 'end')
+        const financialYearStartDisplay = formatFinancialBoundaryDisplay(readonlyStartMonth, 'start')
         const financialYearEndMonth = getFinancialBoundaryMonth(draftData.reportingCycle)
         const financialYearStartMonth = getFinancialBoundaryMonth(draftData.startMonth)
         return (
@@ -3443,17 +3330,29 @@ function SettingsPage({
               </div>
               <button
                 onClick={() => isTaxEditMode ? cancelSectionEdit('tax-details') : startSectionEdit('tax-details')}
+                disabled={taxSectionLockedForTeamMember}
                 className={`h-9 px-4 rounded-md text-sm font-medium transition-colors ${
-                  isTaxEditMode ? 'bg-error-bg text-error hover:bg-error/10' : 'bg-primary text-white hover:bg-primary-light'
+                  taxSectionLockedForTeamMember
+                    ? 'bg-gray-100 text-text-muted cursor-not-allowed'
+                    : (isTaxEditMode ? 'bg-error-bg text-error hover:bg-error/10' : 'bg-primary text-white hover:bg-primary-light')
                 }`}
               >
-                {isTaxEditMode ? 'Cancel Edit' : 'Edit'}
+                {taxSectionLockedForTeamMember ? 'Owner Controlled' : (isTaxEditMode ? 'Cancel Edit' : 'Edit')}
               </button>
             </div>
 
+            {taxSectionLockedForTeamMember && (
+              <div className="rounded-md border border-primary/20 bg-primary/5 px-4 py-3">
+                <p className="text-sm font-semibold text-text-primary">Inherited Tax Setup</p>
+                <p className="text-sm text-text-secondary mt-1">
+                  Tax and reporting fields follow the workspace owned by {affiliatedWorkspaceOwnerName}, so they are read-only for team members.
+                </p>
+              </div>
+            )}
+
             {!isTaxEditMode ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {renderReadonlyField('TIN (Tax Identification Number)', formData.tin, true)}
+                {renderReadonlyField('TIN (Tax Identification Number)', readonlyTin, true)}
                 {renderReadonlyField('Financial Year End', financialYearEndDisplay, true)}
                 {renderReadonlyField('Financial Year Start', financialYearStartDisplay, true)}
               </div>

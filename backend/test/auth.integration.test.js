@@ -150,6 +150,79 @@ test("auth integration: refresh-token rotates access and refresh cookies", async
   );
 });
 
+test("auth integration: register-account migrates an existing email record to a new uid", async (t) => {
+  if (!ensureSetup(t)) return;
+
+  await AuthAccount.create({
+    uid: "legacy_uid_1",
+    email: "migrate-auth@example.com",
+    fullName: "Legacy User",
+    role: "client",
+    provider: "email-password",
+    status: "active",
+    emailVerified: true
+  });
+
+  const response = await request(app).post("/api/v1/auth/register-account").send({
+    uid: "firebase_uid_2",
+    email: "migrate-auth@example.com",
+    fullName: "Legacy User",
+    role: "client",
+    provider: "email-password",
+    status: "active",
+    emailVerified: true
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body?.account?.uid, "firebase_uid_2");
+
+  const legacyAccount = await AuthAccount.findOne({ uid: "legacy_uid_1" }).lean();
+  assert.equal(legacyAccount, null);
+
+  const migratedAccount = await AuthAccount.findOne({
+    uid: "firebase_uid_2",
+    email: "migrate-auth@example.com"
+  }).lean();
+  assert.ok(migratedAccount);
+});
+
+test("auth integration: login-session rebinds stale email ownership to the current uid", async (t) => {
+  if (!ensureSetup(t)) return;
+
+  await AuthAccount.create({
+    uid: "legacy_login_uid",
+    email: "migrate-login@example.com",
+    fullName: "Migrated Login",
+    role: "client",
+    provider: "email-password",
+    status: "active",
+    emailVerified: true
+  });
+
+  const loginResponse = await request(app).post("/api/v1/auth/login-session").send({
+    uid: "firebase_login_uid",
+    email: "migrate-login@example.com",
+    role: "client",
+    loginMethod: "otp",
+    sessionTtlMinutes: 30
+  });
+
+  assert.equal(loginResponse.status, 201);
+  assert.equal(loginResponse.body?.account?.uid, "firebase_login_uid");
+  assert.equal(loginResponse.body?.session?.loginMethod, "otp");
+
+  const migratedAccount = await AuthAccount.findOne({
+    uid: "firebase_login_uid",
+    email: "migrate-login@example.com"
+  }).lean();
+  assert.ok(migratedAccount);
+
+  const sessionRecord = await AuthSession.findOne({
+    sessionId: loginResponse.body?.session?.sessionId
+  }).lean();
+  assert.equal(sessionRecord?.uid, "firebase_login_uid");
+});
+
 test("auth integration: logout-session blocks revoking another user's session", async (t) => {
   if (!ensureSetup(t)) return;
 

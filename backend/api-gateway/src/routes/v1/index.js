@@ -35,6 +35,15 @@ const createDomainProxy = (targetUrl, servicePrefix) =>
         if (Array.isArray(req.user?.roles) && req.user.roles.length > 0) {
           proxyReq.setHeader("x-user-roles", req.user.roles.join(","));
         }
+        if (req.user?.adminLevel) {
+          proxyReq.setHeader("x-user-admin-level", req.user.adminLevel);
+        }
+        if (Array.isArray(req.user?.adminPermissions) && req.user.adminPermissions.length > 0) {
+          proxyReq.setHeader(
+            "x-user-admin-permissions",
+            req.user.adminPermissions.join(",")
+          );
+        }
       }
     }
   });

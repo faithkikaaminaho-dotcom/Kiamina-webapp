@@ -2,6 +2,7 @@ import {
   countUsers,
   deleteUserByUid,
   findUserByEmail,
+  findUserByClientTeamInvite,
   findUserByClientPhone,
   findUserById,
   findUserByUid,
@@ -12,9 +13,11 @@ import {
 } from "../repositories/users.repository.js";
 import { env } from "../config/env.js";
 import { publishUsersRealtimeEvent } from "./realtime-events.service.js";
+import { normalizeAdminAccessRecord } from "../utils/admin-access.js";
 
 const ADMIN_EVENT_ROLES = ["admin", "owner", "superadmin"];
 const CLIENT_ROLE = "client";
+const CLIENT_TEAM_ROLE_VALUES = ["owner", "manager", "accountant", "viewer"];
 const CLIENT_MANAGEMENT_SORT_FIELDS = Object.freeze({
   createdAt: "createdAt",
   updatedAt: "updatedAt",
@@ -65,11 +68,50 @@ export const syncUserFromAuth = async ({
 }) => {
   const normalizedUid = String(uid || "").trim();
   const normalizedEmail = String(email || "").trim().toLowerCase();
-  const existingUser =
-    (normalizedUid ? await findUserByUid(normalizedUid) : null) ||
-    (normalizedEmail ? await findUserByEmail(normalizedEmail) : null);
+  const existingByUid = normalizedUid ? await findUserByUid(normalizedUid) : null;
+  const existingByEmail = normalizedEmail ? await findUserByEmail(normalizedEmail) : null;
+  const resolvedEmail = normalizedEmail || existingByUid?.email || existingByEmail?.email || "";
 
-  const user = await upsertUserFromAuth({ uid, email, displayName, roles });
+  if (existingByUid && existingByEmail && existingByUid.uid !== existingByEmail.uid) {
+    throw createHttpError(409, "The supplied uid and email are linked to different user records.");
+  }
+
+  const normalizedDisplayName = String(displayName ?? "").trim();
+  const normalizedRoles = toLowerRoles(roles);
+  let user;
+
+  if (!existingByUid && normalizedUid && existingByEmail && existingByEmail.uid !== normalizedUid) {
+    const previousUid = existingByEmail.uid;
+    user = await updateUserByUid(previousUid, {
+      $set: {
+        uid: normalizedUid,
+        email: resolvedEmail,
+        ...(normalizedDisplayName ? { displayName: normalizedDisplayName } : {}),
+        ...(normalizedRoles.length > 0 ? { roles: normalizedRoles } : {})
+      }
+    });
+
+    if (env.documentsServiceUrl) {
+      try {
+        await reassignDocumentsForOwner({
+          fromOwnerUserId: previousUid,
+          toOwnerUserId: normalizedUid,
+          actorEmail: resolvedEmail
+        });
+      } catch (error) {
+        console.warn("users-service document ownership migration warning:", error.message);
+      }
+    }
+  } else {
+    user = await upsertUserFromAuth({
+      uid: normalizedUid,
+      email: resolvedEmail,
+      displayName: normalizedDisplayName,
+      roles: normalizedRoles
+    });
+  }
+
+  const existingUser = existingByUid || existingByEmail;
   const normalizedSignupCapture = normalizeSignupCapture(signupCapture);
   const shouldBackfillSignupCapture = hasSignupCaptureValues(normalizedSignupCapture) && user;
   let resolvedUser = user;
@@ -140,8 +182,9 @@ const deriveProfileStepCompleted = ({
 }) => Boolean(firstName && lastName && email && businessType && businessName && country);
 
 const deriveVerificationSnapshot = ({ currentVerification = {}, profileStepCompleted = false }) => {
-  const identityStepCompleted = Boolean(currentVerification?.identityStepCompleted);
-  const businessStepCompleted = Boolean(currentVerification?.businessStepCompleted);
+  // Identity and business verification are retired in the MVP flow.
+  const identityStepCompleted = true;
+  const businessStepCompleted = true;
   const stepsCompleted =
     Number(profileStepCompleted) + Number(identityStepCompleted) + Number(businessStepCompleted);
 
@@ -178,6 +221,230 @@ const createHttpError = (status, message, details = null) => {
     error.details = details;
   }
   return error;
+};
+
+const normalizeClientTeamRole = (value = "", fallback = "viewer") => {
+  const normalized = String(value || "").trim().toLowerCase();
+  return CLIENT_TEAM_ROLE_VALUES.includes(normalized) ? normalized : fallback;
+};
+
+const buildClientTeamCompanyId = (seed = "") => {
+  const normalized = String(seed || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  if (!normalized) {
+    return "CMP-LOCAL-0001";
+  }
+  return `CMP-${normalized.slice(0, 12).toUpperCase()}`;
+};
+
+const resolveClientTeamOwnerName = (user = {}) => {
+  const settingsProfile = toPlainObject(user?.clientWorkspace?.settingsProfile, {});
+  const clientProfile = toPlainObject(user?.clientProfile, {});
+  return String(
+    settingsProfile.fullName
+      || clientProfile.fullName
+      || user?.displayName
+      || user?.email?.split("@")?.[0]
+      || "Primary Owner"
+  ).trim() || "Primary Owner";
+};
+
+const resolveClientTeamCompanySeed = (user = {}) => {
+  const settingsProfile = toPlainObject(user?.clientWorkspace?.settingsProfile, {});
+  const entityProfile = toPlainObject(user?.entityProfile, {});
+  return String(
+    entityProfile.businessName
+      || settingsProfile.businessName
+      || user?.email
+      || ""
+  ).trim();
+};
+
+const normalizeClientBusinessTypeValue = (value = "") => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "business") return "business";
+  if (normalized === "individual") return "individual";
+  if (normalized === "non-profit" || normalized === "non profit" || normalized === "nonprofit") {
+    return "non-profit";
+  }
+  return "";
+};
+
+const toIsoDateOrNow = (value) => {
+  const parsed = Date.parse(value || "");
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : new Date().toISOString();
+};
+
+const isClientTeamInviteExpired = (invite = {}) => {
+  const expiryMs = Date.parse(invite?.expiresAt || "");
+  if (!Number.isFinite(expiryMs)) {
+    return true;
+  }
+  return Date.now() > expiryMs;
+};
+
+const normalizeClientTeamInviteStatus = (invite = {}) => {
+  const normalized = String(invite?.status || "").trim().toLowerCase();
+  if (normalized === "accepted") return "accepted";
+  if (normalized === "cancelled" || normalized === "canceled" || normalized === "revoked") {
+    return "cancelled";
+  }
+  if (normalized === "expired") return "expired";
+  return isClientTeamInviteExpired(invite) ? "expired" : "pending";
+};
+
+const normalizeClientTeamInviteRecord = (invite = {}, { companyId = "", ownerName = "" } = {}) => {
+  const normalizedEmail = String(invite?.email || "").trim().toLowerCase();
+  return {
+    id:
+      String(invite?.id || "").trim()
+      || `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    email: normalizedEmail,
+    role: normalizeClientTeamRole(invite?.role),
+    invitedBy: String(invite?.invitedBy || ownerName || "Primary Owner").trim() || "Primary Owner",
+    companyId: String(invite?.companyId || companyId).trim(),
+    token: String(invite?.token || "").trim(),
+    expiresAt: toIsoDateOrNow(invite?.expiresAt),
+    status: normalizeClientTeamInviteStatus(invite),
+    createdAt: toIsoDateOrNow(invite?.createdAt),
+    acceptedAt: invite?.acceptedAt ? toIsoDateOrNow(invite.acceptedAt) : "",
+    cancelledAt: invite?.cancelledAt ? toIsoDateOrNow(invite.cancelledAt) : "",
+    singleUse: invite?.singleUse !== false,
+    reason: String(invite?.reason || "").trim()
+  };
+};
+
+const normalizeClientTeamMemberRecord = (member = {}, { companyId = "" } = {}) => {
+  const normalizedEmail = String(member?.email || "").trim().toLowerCase();
+  if (!normalizedEmail) return null;
+  const normalizedRole = normalizeClientTeamRole(member?.role, "viewer");
+  return {
+    id:
+      String(member?.id || "").trim()
+      || `TM-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    email: normalizedEmail,
+    fullName: String(member?.fullName || normalizedEmail).trim() || normalizedEmail,
+    role: normalizedRole,
+    companyId: String(member?.companyId || companyId).trim(),
+    status: String(member?.status || "Active").trim() || "Active",
+    joinedAt: toIsoDateOrNow(member?.joinedAt),
+    isPrimaryOwner: normalizedRole === "owner" || Boolean(member?.isPrimaryOwner)
+  };
+};
+
+const sortClientTeamInvites = (rows = []) =>
+  [...(Array.isArray(rows) ? rows : [])].sort((left, right) => {
+    const rightTime = Date.parse(right?.createdAt || right?.expiresAt || "") || 0;
+    const leftTime = Date.parse(left?.createdAt || left?.expiresAt || "") || 0;
+    if (rightTime !== leftTime) return rightTime - leftTime;
+    return String(left?.email || "").localeCompare(String(right?.email || ""));
+  });
+
+const sortClientTeamMembers = (rows = []) =>
+  [...(Array.isArray(rows) ? rows : [])].sort((left, right) => {
+    if (Boolean(left?.isPrimaryOwner) !== Boolean(right?.isPrimaryOwner)) {
+      return left?.isPrimaryOwner ? -1 : 1;
+    }
+    return String(left?.fullName || left?.email || "").localeCompare(
+      String(right?.fullName || right?.email || "")
+    );
+  });
+
+const buildClientTeamInviteUrl = ({ inviteBaseUrl = "", invite = {} } = {}) => {
+  const normalizedBase = String(inviteBaseUrl || "").trim();
+  if (!normalizedBase) return "";
+
+  try {
+    const baseUrl = normalizedBase.includes("/team/setup")
+      ? new URL(normalizedBase)
+      : new URL("/team/setup", normalizedBase);
+    baseUrl.searchParams.set("invite", String(invite?.token || "").trim());
+    baseUrl.searchParams.set("company", String(invite?.companyId || "").trim());
+    baseUrl.searchParams.set("email", String(invite?.email || "").trim().toLowerCase());
+    return baseUrl.toString();
+  } catch {
+    const trimmedBase = normalizedBase.replace(/\/+$/, "");
+    if (!trimmedBase) return "";
+    const separator = trimmedBase.includes("/team/setup") ? "" : "/team/setup";
+    const query = new URLSearchParams({
+      invite: String(invite?.token || "").trim(),
+      company: String(invite?.companyId || "").trim(),
+      email: String(invite?.email || "").trim().toLowerCase()
+    }).toString();
+    return `${trimmedBase}${separator}?${query}`;
+  }
+};
+
+const SYSTEM_NOTIFICATION_HEADERS = {
+  "x-user-id": "system-users-service",
+  "x-user-email": "no-reply@kiamina.local",
+  "x-user-roles": "superadmin"
+};
+
+const dispatchClientTeamInviteEmail = async ({
+  invite = {},
+  owner = {},
+  inviteUrl = ""
+} = {}) => {
+  if (!env.notificationsServiceUrl) {
+    return { queued: false, reason: "notifications-service-url-not-configured" };
+  }
+  if (!inviteUrl) {
+    return { queued: false, reason: "invite-url-not-configured" };
+  }
+
+  const ownerName = String(owner?.fullName || owner?.email || "the primary owner").trim();
+  const ownerCompanyName = String(owner?.companyName || "").trim();
+  const workspaceLabel = ownerCompanyName || "Kiamina workspace";
+  const roleLabel = normalizeClientTeamRole(invite?.role, "viewer");
+
+  const subject = `${ownerName} invited you to join ${workspaceLabel}`;
+  const message = [
+    `You have been invited by ${ownerName} to join ${workspaceLabel} on Kiamina as ${roleLabel}.`,
+    "",
+    "Next steps:",
+    "1. Open the invite link below.",
+    `2. Create your account with ${String(invite?.email || "").trim().toLowerCase()}.`,
+    "3. Complete the OTP and email verification steps to finish onboarding.",
+    "",
+    `Invite link: ${inviteUrl}`,
+    "",
+    "If the link opens an invalid page or expires, ask the primary owner to send a fresh invite."
+  ].join("\n");
+
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => abortController.abort(), env.notificationsServiceTimeoutMs);
+
+  try {
+    const response = await fetch(`${env.notificationsServiceUrl}/api/v1/notifications/send-email`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...SYSTEM_NOTIFICATION_HEADERS
+      },
+      body: JSON.stringify({
+        to: [String(invite?.email || "").trim().toLowerCase()],
+        subject,
+        message
+      }),
+      signal: abortController.signal
+    });
+
+    if (!response.ok) {
+      return { queued: false, reason: `notification-service-status-${response.status}` };
+    }
+
+    return { queued: true, reason: "" };
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      return { queued: false, reason: "notification-request-timeout" };
+    }
+    return { queued: false, reason: "notification-request-failed" };
+  } finally {
+    clearTimeout(timeoutId);
+  }
 };
 
 const sanitizePhoneDigits = (value = "") =>
@@ -544,6 +811,77 @@ const deleteAuthAccountForUid = async ({
   };
 };
 
+const reassignDocumentsForOwner = async ({
+  fromOwnerUserId,
+  toOwnerUserId,
+  actorEmail = ""
+}) => {
+  const normalizedFromOwnerUserId = String(fromOwnerUserId || "").trim();
+  const normalizedToOwnerUserId = String(toOwnerUserId || "").trim();
+
+  if (!normalizedFromOwnerUserId || !normalizedToOwnerUserId) {
+    return {
+      attempted: false,
+      skipped: true,
+      reason: "missing-owner-user-id"
+    };
+  }
+
+  if (normalizedFromOwnerUserId === normalizedToOwnerUserId) {
+    return {
+      attempted: false,
+      skipped: true,
+      reason: "owner-user-id-unchanged"
+    };
+  }
+
+  if (!env.documentsServiceUrl) {
+    return {
+      attempted: false,
+      skipped: true,
+      reason: "documents-service-url-not-configured"
+    };
+  }
+
+  const response = await requestServiceJson({
+    url: `${env.documentsServiceUrl}/api/v1/documents/owner/${encodeURIComponent(normalizedFromOwnerUserId)}/reassign`,
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "x-user-id": normalizedToOwnerUserId,
+      "x-user-email": String(actorEmail || "").trim().toLowerCase(),
+      "x-user-roles": "superadmin"
+    },
+    body: JSON.stringify({
+      toOwnerUserId: normalizedToOwnerUserId
+    }),
+    timeoutMs: env.documentsServiceTimeoutMs
+  });
+
+  if (!response.ok) {
+    throw createHttpError(
+      response.status || 502,
+      response.message || "document-ownership-reassignment-failed",
+      {
+        fromOwnerUserId: normalizedFromOwnerUserId,
+        toOwnerUserId: normalizedToOwnerUserId,
+        statusCode: response.status || 502,
+        reason: response.message || "document-ownership-reassignment-failed"
+      }
+    );
+  }
+
+  return {
+    attempted: true,
+    skipped: false,
+    fromOwnerUserId: normalizedFromOwnerUserId,
+    toOwnerUserId: normalizedToOwnerUserId,
+    migratedDocuments: Number(response.data?.migratedDocuments || 0),
+    migratedAccountingRecords: Number(response.data?.migratedAccountingRecords || 0),
+    migratedStorageObjects: Number(response.data?.migratedStorageObjects || 0)
+  };
+};
+
 const normalizeSearchTerm = (value = "") => String(value || "").trim();
 const escapeRegex = (value = "") => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -556,6 +894,345 @@ const toPlainObject = (value, fallback = {}) => {
     return { ...value };
   }
   return fallback;
+};
+
+const buildClientTeamState = ({ user } = {}) => {
+  const ownerSummary = buildClientTeamOwnerSummary({ user });
+  const ownerEmail = ownerSummary.email;
+  const ownerName = ownerSummary.fullName;
+  const companyId = ownerSummary.companyId;
+  const rawMembers = Array.isArray(user?.clientWorkspace?.teamMembers)
+    ? user.clientWorkspace.teamMembers
+    : [];
+  const rawInvites = Array.isArray(user?.clientWorkspace?.teamInvites)
+    ? user.clientWorkspace.teamInvites
+    : [];
+
+  const normalizedMembers = rawMembers
+    .map((entry) => normalizeClientTeamMemberRecord(entry, { companyId }))
+    .filter(Boolean);
+  const normalizedInvites = rawInvites
+    .map((entry) => normalizeClientTeamInviteRecord(entry, { companyId, ownerName }))
+    .filter((entry) => (
+      entry.email
+      && entry.token
+      && String(entry.status || "").trim().toLowerCase() !== "accepted"
+    ));
+
+  const ownerMemberId = `TM-OWNER-${companyId}`;
+  const ownerMember = normalizeClientTeamMemberRecord(
+    {
+      id: ownerMemberId,
+      email: ownerEmail || "owner@company.local",
+      fullName: ownerName || "Primary Owner",
+      role: "owner",
+      companyId,
+      status: "Active",
+      joinedAt: user?.createdAt || new Date().toISOString(),
+      isPrimaryOwner: true
+    },
+    { companyId }
+  );
+
+  const ownerIndex = normalizedMembers.findIndex((member) => (
+    Boolean(member?.isPrimaryOwner) || normalizeClientTeamRole(member?.role, "viewer") === "owner"
+  ));
+  if (ownerMember) {
+    if (ownerIndex === -1) {
+      normalizedMembers.unshift(ownerMember);
+    } else {
+      normalizedMembers.splice(ownerIndex, 1, {
+        ...normalizedMembers[ownerIndex],
+        ...ownerMember
+      });
+    }
+  }
+
+  return {
+    owner: ownerSummary,
+    members: sortClientTeamMembers(normalizedMembers),
+    invites: sortClientTeamInvites(normalizedInvites)
+  };
+};
+
+const buildClientTeamOwnerBusinessSnapshot = ({ user } = {}) => {
+  const entityProfile = toPlainObject(user?.entityProfile, {});
+  const settingsProfile = toPlainObject(user?.clientWorkspace?.settingsProfile, {});
+  const onboardingState = toPlainObject(user?.clientWorkspace?.onboardingState, {});
+  const onboardingData = toPlainObject(onboardingState?.data, {});
+  const dashboard = toPlainObject(user?.clientDashboard, {});
+
+  return {
+    businessType: normalizeClientBusinessTypeValue(
+      entityProfile.businessType
+        || settingsProfile.businessType
+        || onboardingData.businessType
+        || ""
+    ),
+    businessName: String(
+      entityProfile.businessName
+        || settingsProfile.businessName
+        || onboardingData.businessName
+        || dashboard.companyName
+        || ""
+    ).trim(),
+    country: String(
+      entityProfile.country
+        || settingsProfile.country
+        || onboardingData.country
+        || dashboard.businessCountry
+        || ""
+    ).trim(),
+    currency: String(
+      entityProfile.currency
+        || settingsProfile.currency
+        || onboardingData.currency
+        || dashboard.baseCurrency
+        || "NGN"
+    ).trim().toUpperCase() || "NGN",
+    industry: String(
+      entityProfile.industry
+        || settingsProfile.industry
+        || onboardingData.industry
+        || ""
+    ).trim(),
+    industryOther: String(
+      entityProfile.industryOther
+        || settingsProfile.industryOther
+        || onboardingData.industryOther
+        || ""
+    ).trim(),
+    cacNumber: String(
+      entityProfile.cacNumber
+        || settingsProfile.cacNumber
+        || onboardingData.cacNumber
+        || ""
+    ).trim(),
+    tin: String(
+      entityProfile.tin
+        || settingsProfile.tin
+        || onboardingData.tin
+        || ""
+    ).trim(),
+    reportingCycle: String(
+      entityProfile.reportingCycle
+        || settingsProfile.reportingCycle
+        || onboardingData.reportingCycle
+        || ""
+    ).trim(),
+    startMonth: String(
+      entityProfile.startMonth
+        || settingsProfile.startMonth
+        || onboardingData.startMonth
+        || ""
+    ).trim()
+  };
+};
+
+const buildClientTeamOwnerSummary = ({ user } = {}) => {
+  const businessSnapshot = buildClientTeamOwnerBusinessSnapshot({ user });
+  return {
+    uid: String(user?.uid || "").trim(),
+    email: String(user?.email || "").trim().toLowerCase(),
+    fullName: resolveClientTeamOwnerName(user),
+    companyId: buildClientTeamCompanyId(resolveClientTeamCompanySeed(user)),
+    companyName: businessSnapshot.businessName,
+    businessType: businessSnapshot.businessType,
+    country: businessSnapshot.country,
+    currency: businessSnapshot.currency
+  };
+};
+
+const isAffiliatedClientTeamMember = (user = {}) => {
+  const teamAccess = toPlainObject(user?.clientWorkspace?.teamAccess, {});
+  const ownerUid = String(teamAccess.ownerUid || "").trim();
+  const ownerEmail = String(teamAccess.ownerEmail || "").trim().toLowerCase();
+  const currentUid = String(user?.uid || "").trim();
+  const currentEmail = String(user?.email || "").trim().toLowerCase();
+
+  if (!ownerUid && !ownerEmail) {
+    return false;
+  }
+
+  if (ownerUid && currentUid && ownerUid === currentUid) {
+    return false;
+  }
+
+  if (ownerEmail && currentEmail && ownerEmail === currentEmail) {
+    return false;
+  }
+
+  return true;
+};
+
+const resolveAffiliatedClientTeamOwnerUser = async ({ user } = {}) => {
+  if (!isAffiliatedClientTeamMember(user)) {
+    return null;
+  }
+
+  const teamAccess = toPlainObject(user?.clientWorkspace?.teamAccess, {});
+  const ownerUid = String(teamAccess.ownerUid || "").trim();
+  const ownerEmail = String(teamAccess.ownerEmail || "").trim().toLowerCase();
+
+  const ownerUser = ownerUid
+    ? await findUserByUid(ownerUid)
+    : await findUserByEmail(ownerEmail);
+
+  if (!ownerUser || !isClientUser(ownerUser)) {
+    return null;
+  }
+
+  return ownerUser;
+};
+
+const buildAffiliatedClientTeamAccess = ({
+  ownerUser,
+  role = "viewer",
+  existingTeamAccess = {},
+  joinedAt = "",
+  inviteId = "",
+  inviteToken = ""
+} = {}) => {
+  const ownerSummary = buildClientTeamOwnerSummary({ user: ownerUser });
+
+  return {
+    ...toPlainObject(existingTeamAccess, {}),
+    role: normalizeClientTeamRole(role, "viewer"),
+    companyId: ownerSummary.companyId,
+    ownerUid: ownerSummary.uid,
+    ownerEmail: ownerSummary.email,
+    ownerName: ownerSummary.fullName,
+    joinedAt: joinedAt || existingTeamAccess?.joinedAt || new Date().toISOString(),
+    inviteId: String(inviteId || existingTeamAccess?.inviteId || "").trim(),
+    inviteToken: String(inviteToken || existingTeamAccess?.inviteToken || "").trim(),
+    accountType: "team-member",
+    companyName: ownerSummary.companyName,
+    businessType: ownerSummary.businessType,
+    country: ownerSummary.country,
+    currency: ownerSummary.currency
+  };
+};
+
+const buildAffiliatedClientBusinessPatch = ({
+  ownerUser,
+  memberUser,
+  role = "viewer",
+  joinedAt = "",
+  inviteId = "",
+  inviteToken = ""
+} = {}) => {
+  const ownerBusiness = buildClientTeamOwnerBusinessSnapshot({ user: ownerUser });
+  const memberOnboardingState = toPlainObject(memberUser?.clientWorkspace?.onboardingState, {});
+  const memberOnboardingData = toPlainObject(memberOnboardingState?.data, {});
+  const existingTeamAccess = toPlainObject(memberUser?.clientWorkspace?.teamAccess, {});
+  const teamAccess = buildAffiliatedClientTeamAccess({
+    ownerUser,
+    role,
+    existingTeamAccess,
+    joinedAt,
+    inviteId,
+    inviteToken
+  });
+
+  return {
+    "entityProfile.businessType": ownerBusiness.businessType,
+    "entityProfile.businessName": ownerBusiness.businessName,
+    "entityProfile.country": ownerBusiness.country,
+    "entityProfile.currency": ownerBusiness.currency,
+    "entityProfile.industry": ownerBusiness.industry,
+    "entityProfile.industryOther": ownerBusiness.industryOther,
+    "entityProfile.cacNumber": ownerBusiness.cacNumber,
+    "entityProfile.tin": ownerBusiness.tin,
+    "entityProfile.reportingCycle": ownerBusiness.reportingCycle,
+    "entityProfile.startMonth": ownerBusiness.startMonth,
+    "clientDashboard.companyName": ownerBusiness.businessName,
+    "clientDashboard.businessCountry": ownerBusiness.country,
+    "clientDashboard.baseCurrency": ownerBusiness.currency,
+    "clientWorkspace.settingsProfile.businessType": ownerBusiness.businessType,
+    "clientWorkspace.settingsProfile.businessName": ownerBusiness.businessName,
+    "clientWorkspace.settingsProfile.country": ownerBusiness.country,
+    "clientWorkspace.settingsProfile.currency": ownerBusiness.currency,
+    "clientWorkspace.settingsProfile.industry": ownerBusiness.industry,
+    "clientWorkspace.settingsProfile.industryOther": ownerBusiness.industryOther,
+    "clientWorkspace.settingsProfile.cacNumber": ownerBusiness.cacNumber,
+    "clientWorkspace.settingsProfile.tin": ownerBusiness.tin,
+    "clientWorkspace.settingsProfile.reportingCycle": ownerBusiness.reportingCycle,
+    "clientWorkspace.settingsProfile.startMonth": ownerBusiness.startMonth,
+    "clientWorkspace.onboardingState.data.businessType": ownerBusiness.businessType,
+    "clientWorkspace.onboardingState.data.businessName": ownerBusiness.businessName,
+    "clientWorkspace.onboardingState.data.country": ownerBusiness.country,
+    "clientWorkspace.onboardingState.data.currency": ownerBusiness.currency,
+    "clientWorkspace.onboardingState.data.industry": ownerBusiness.industry,
+    "clientWorkspace.onboardingState.data.industryOther": ownerBusiness.industryOther,
+    "clientWorkspace.onboardingState.data.cacNumber": ownerBusiness.cacNumber,
+    "clientWorkspace.onboardingState.data.tin": ownerBusiness.tin,
+    "clientWorkspace.onboardingState.data.reportingCycle": ownerBusiness.reportingCycle,
+    "clientWorkspace.onboardingState.data.startMonth": ownerBusiness.startMonth,
+    "clientWorkspace.onboardingState.data.email": String(memberOnboardingData.email || memberUser?.email || "").trim().toLowerCase(),
+    "clientWorkspace.teamAccess": teamAccess,
+    "clientWorkspace.updatedAt": new Date()
+  };
+};
+
+const syncAffiliatedClientWorkspaceToMembers = async ({ ownerUser } = {}) => {
+  const teamState = buildClientTeamState({ user: ownerUser });
+  const memberRows = teamState.members.filter((member) => !member?.isPrimaryOwner);
+
+  await Promise.all(memberRows.map(async (member) => {
+    const memberUser = await findUserByEmail(member.email);
+    if (!memberUser) {
+      return;
+    }
+
+    await updateUserByUid(memberUser.uid, {
+      $set: buildAffiliatedClientBusinessPatch({
+        ownerUser,
+        memberUser,
+        role: member.role,
+        joinedAt: member.joinedAt
+      })
+    });
+  }));
+};
+
+const findClientTeamInviteForUser = ({ user, token = "", companyId = "" } = {}) => {
+  const normalizedToken = String(token || "").trim();
+  const normalizedCompanyId = String(companyId || "").trim();
+  if (!normalizedToken || !user) return null;
+
+  const state = buildClientTeamState({ user });
+  const invite = state.invites.find((entry) => {
+    if (String(entry?.token || "").trim() !== normalizedToken) return false;
+    if (!normalizedCompanyId) return true;
+    return String(entry?.companyId || "").trim() === normalizedCompanyId;
+  });
+  if (!invite) return null;
+
+  return {
+    user,
+    state,
+    invite
+  };
+};
+
+const buildClientTeamPayload = ({ user } = {}) => {
+  const state = buildClientTeamState({ user });
+  return {
+    owner: state.owner,
+    members: state.members,
+    invites: state.invites
+  };
+};
+
+const buildClientTeamInviteLookupPayload = ({ user, invite } = {}) => {
+  const state = buildClientTeamState({ user });
+  return {
+    owner: state.owner,
+    invite: normalizeClientTeamInviteRecord(invite, {
+      companyId: state.owner.companyId,
+      ownerName: state.owner.fullName
+    })
+  };
 };
 
 const buildClientWorkspacePayload = ({ user }) => ({
@@ -936,11 +1613,30 @@ const buildDashboardOverviewPayload = ({ user, documentSummary = null }) => ({
 
 const buildAdminDashboardPayload = ({ user }) => {
   const adminDashboard = toPlainObject(user.adminDashboard, {});
+  const normalizedAdminAccess = normalizeAdminAccessRecord({
+    adminAccess: user.adminAccess,
+    roles: user.roles
+  });
   const supportLeads = Array.isArray(adminDashboard.supportLeads)
     ? adminDashboard.supportLeads
     : [];
   const newsletters = Array.isArray(adminDashboard.newsletters)
     ? adminDashboard.newsletters
+    : [];
+  const workSessions = Array.isArray(adminDashboard.workSessions)
+    ? adminDashboard.workSessions
+    : [];
+  const sentNotifications = Array.isArray(adminDashboard.sentNotifications)
+    ? adminDashboard.sentNotifications
+    : [];
+  const notificationDrafts = Array.isArray(adminDashboard.notificationDrafts)
+    ? adminDashboard.notificationDrafts
+    : [];
+  const scheduledNotifications = Array.isArray(adminDashboard.scheduledNotifications)
+    ? adminDashboard.scheduledNotifications
+    : [];
+  const trashEntries = Array.isArray(adminDashboard.trashEntries)
+    ? adminDashboard.trashEntries
     : [];
 
   const openSupportLeads = supportLeads.filter(
@@ -959,12 +1655,17 @@ const buildAdminDashboardPayload = ({ user }) => {
     displayName: user.displayName || "",
     roles: Array.isArray(user.roles) ? user.roles : [],
     adminProfile: toPlainObject(user.adminProfile, {}),
-    adminAccess: toPlainObject(user.adminAccess, {}),
+    adminAccess: normalizedAdminAccess,
     dashboard: {
       ...adminDashboard,
       securityPreferences: toPlainObject(adminDashboard.securityPreferences, {}),
       supportLeads,
       newsletters,
+      workSessions,
+      sentNotifications,
+      notificationDrafts,
+      scheduledNotifications,
+      trashEntries,
       stats: {
         openSupportLeads,
         newsletterSubscribers,
@@ -1109,7 +1810,10 @@ const buildAdminStaffRow = ({ user }) => ({
   createdAt: user.createdAt || null,
   updatedAt: user.updatedAt || null,
   adminProfile: toPlainObject(user.adminProfile, {}),
-  adminAccess: toPlainObject(user.adminAccess, {}),
+  adminAccess: normalizeAdminAccessRecord({
+    adminAccess: user.adminAccess,
+    roles: user.roles
+  }),
   dashboardSecurityPreferences: toPlainObject(user.adminDashboard?.securityPreferences, {})
 });
 
@@ -1134,18 +1838,14 @@ const emitAdminDashboardRealtimeUpdate = ({
 
 export const ensureUserFromActor = async ({ uid, email, roles = [], displayName = "" }) => {
   if (!uid) return null;
-
   const existingByUid = await findUserByUid(uid);
   if (existingByUid) return existingByUid;
 
   const normalizedEmail = String(email || "").trim().toLowerCase();
   if (!normalizedEmail) return null;
 
-  const existingByEmail = await findUserByEmail(normalizedEmail);
-  const resolvedUid = existingByEmail?.uid || uid;
-
-  return upsertUserFromAuth({
-    uid: resolvedUid,
+  return syncUserFromAuth({
+    uid,
     email: normalizedEmail,
     displayName,
     roles
@@ -1217,6 +1917,12 @@ export const updateClientProfileByUid = async ({
       phoneLocalNumber: existingUser.clientProfile?.phoneLocalNumber || "",
       displayPhone: existingUser.clientProfile?.phone || ""
     };
+  const affiliatedOwnerUser = isClientUser(existingUser)
+    ? await resolveAffiliatedClientTeamOwnerUser({ user: existingUser })
+    : null;
+  const affiliatedBusinessSnapshot = affiliatedOwnerUser
+    ? buildClientTeamOwnerBusinessSnapshot({ user: affiliatedOwnerUser })
+    : null;
 
   const nextPayload = {
     ...payload,
@@ -1233,23 +1939,67 @@ export const updateClientProfileByUid = async ({
   }
 
   const businessName =
-    payload["entityProfile.businessName"] !== undefined
+    affiliatedBusinessSnapshot?.businessName
+      || (payload["entityProfile.businessName"] !== undefined
       ? payload["entityProfile.businessName"]
-      : existingUser.entityProfile?.businessName || "";
+      : existingUser.entityProfile?.businessName || "");
   const businessCountry =
-    payload["entityProfile.country"] !== undefined
+    affiliatedBusinessSnapshot?.country
+      || (payload["entityProfile.country"] !== undefined
       ? payload["entityProfile.country"]
-      : existingUser.entityProfile?.country || "";
+      : existingUser.entityProfile?.country || "");
   const baseCurrency =
-    payload["entityProfile.currency"] !== undefined
+    affiliatedBusinessSnapshot?.currency
+      || (payload["entityProfile.currency"] !== undefined
       ? payload["entityProfile.currency"]
-      : existingUser.entityProfile?.currency || "NGN";
+      : existingUser.entityProfile?.currency || "NGN");
   const businessType =
-    payload["entityProfile.businessType"] !== undefined
+    affiliatedBusinessSnapshot?.businessType
+      || (payload["entityProfile.businessType"] !== undefined
       ? payload["entityProfile.businessType"]
-      : existingUser.entityProfile?.businessType || "";
+      : existingUser.entityProfile?.businessType || "");
+  const industry =
+    affiliatedBusinessSnapshot?.industry
+      || (payload["entityProfile.industry"] !== undefined
+      ? payload["entityProfile.industry"]
+      : existingUser.entityProfile?.industry || "");
+  const industryOther =
+    affiliatedBusinessSnapshot?.industryOther
+      || (payload["entityProfile.industryOther"] !== undefined
+      ? payload["entityProfile.industryOther"]
+      : existingUser.entityProfile?.industryOther || "");
+  const cacNumber =
+    affiliatedBusinessSnapshot?.cacNumber
+      || (payload["entityProfile.cacNumber"] !== undefined
+      ? payload["entityProfile.cacNumber"]
+      : existingUser.entityProfile?.cacNumber || "");
+  const tin =
+    affiliatedBusinessSnapshot?.tin
+      || (payload["entityProfile.tin"] !== undefined
+      ? payload["entityProfile.tin"]
+      : existingUser.entityProfile?.tin || "");
+  const reportingCycle =
+    affiliatedBusinessSnapshot?.reportingCycle
+      || (payload["entityProfile.reportingCycle"] !== undefined
+      ? payload["entityProfile.reportingCycle"]
+      : existingUser.entityProfile?.reportingCycle || "");
+  const startMonth =
+    affiliatedBusinessSnapshot?.startMonth
+      || (payload["entityProfile.startMonth"] !== undefined
+      ? payload["entityProfile.startMonth"]
+      : existingUser.entityProfile?.startMonth || "");
 
   nextPayload["clientDashboard.lastVisitedAt"] = new Date();
+  nextPayload["entityProfile.businessType"] = businessType;
+  nextPayload["entityProfile.businessName"] = businessName;
+  nextPayload["entityProfile.country"] = businessCountry;
+  nextPayload["entityProfile.currency"] = baseCurrency;
+  nextPayload["entityProfile.industry"] = industry;
+  nextPayload["entityProfile.industryOther"] = industryOther;
+  nextPayload["entityProfile.cacNumber"] = cacNumber;
+  nextPayload["entityProfile.tin"] = tin;
+  nextPayload["entityProfile.reportingCycle"] = reportingCycle;
+  nextPayload["entityProfile.startMonth"] = startMonth;
   nextPayload["clientDashboard.companyName"] = businessName;
   nextPayload["clientDashboard.businessCountry"] = businessCountry;
   nextPayload["clientDashboard.baseCurrency"] = baseCurrency;
@@ -1294,30 +2044,12 @@ export const updateClientProfileByUid = async ({
     nextPayload["clientProfile.language"] !== undefined
       ? nextPayload["clientProfile.language"]
       : existingUser.clientProfile?.language || "English";
-  nextPayload["clientWorkspace.settingsProfile.industry"] =
-    nextPayload["entityProfile.industry"] !== undefined
-      ? nextPayload["entityProfile.industry"]
-      : existingUser.entityProfile?.industry || "";
-  nextPayload["clientWorkspace.settingsProfile.industryOther"] =
-    nextPayload["entityProfile.industryOther"] !== undefined
-      ? nextPayload["entityProfile.industryOther"]
-      : existingUser.entityProfile?.industryOther || "";
-  nextPayload["clientWorkspace.settingsProfile.cacNumber"] =
-    nextPayload["entityProfile.cacNumber"] !== undefined
-      ? nextPayload["entityProfile.cacNumber"]
-      : existingUser.entityProfile?.cacNumber || "";
-  nextPayload["clientWorkspace.settingsProfile.tin"] =
-    nextPayload["entityProfile.tin"] !== undefined
-      ? nextPayload["entityProfile.tin"]
-      : existingUser.entityProfile?.tin || "";
-  nextPayload["clientWorkspace.settingsProfile.reportingCycle"] =
-    nextPayload["entityProfile.reportingCycle"] !== undefined
-      ? nextPayload["entityProfile.reportingCycle"]
-      : existingUser.entityProfile?.reportingCycle || "";
-  nextPayload["clientWorkspace.settingsProfile.startMonth"] =
-    nextPayload["entityProfile.startMonth"] !== undefined
-      ? nextPayload["entityProfile.startMonth"]
-      : existingUser.entityProfile?.startMonth || "";
+  nextPayload["clientWorkspace.settingsProfile.industry"] = industry;
+  nextPayload["clientWorkspace.settingsProfile.industryOther"] = industryOther;
+  nextPayload["clientWorkspace.settingsProfile.cacNumber"] = cacNumber;
+  nextPayload["clientWorkspace.settingsProfile.tin"] = tin;
+  nextPayload["clientWorkspace.settingsProfile.reportingCycle"] = reportingCycle;
+  nextPayload["clientWorkspace.settingsProfile.startMonth"] = startMonth;
 
   const profileStepCompleted = deriveProfileStepCompleted({
     firstName: normalizedFirstName,
@@ -1341,6 +2073,10 @@ export const updateClientProfileByUid = async ({
 
   const updatedUser = await updateUserByUid(uid, { $set: nextPayload });
   if (!updatedUser) return null;
+
+  if (isClientUser(updatedUser) && !affiliatedOwnerUser) {
+    await syncAffiliatedClientWorkspaceToMembers({ ownerUser: updatedUser });
+  }
 
   void emitUsersRealtimeEvent({
     eventType: "client.profile.updated",
@@ -1691,6 +2427,436 @@ export const updateClientWorkspaceByUid = async ({
   });
 
   return response;
+};
+
+export const getClientTeamByUid = async ({
+  uid,
+  actorEmail,
+  actorRoles = []
+}) => {
+  const user = await ensureUserFromActor({
+    uid,
+    email: actorEmail,
+    roles: actorRoles,
+    displayName: ""
+  });
+  if (!user) return null;
+  if (!isClientUser(user)) {
+    throw createHttpError(403, "Only client users can manage team workspaces.");
+  }
+
+  const workspaceOwnerUser = await resolveAffiliatedClientTeamOwnerUser({ user }) || user;
+  return buildClientTeamPayload({ user: workspaceOwnerUser });
+};
+
+export const getPublicClientTeamInvite = async ({
+  token = "",
+  companyId = ""
+}) => {
+  const ownerUser = await findUserByClientTeamInvite({ token });
+  if (!ownerUser || !isClientUser(ownerUser)) {
+    return null;
+  }
+
+  const lookup = findClientTeamInviteForUser({
+    user: ownerUser,
+    token,
+    companyId
+  });
+  if (!lookup) {
+    return null;
+  }
+
+  return buildClientTeamInviteLookupPayload({
+    user: ownerUser,
+    invite: lookup.invite
+  });
+};
+
+export const createClientTeamInviteByUid = async ({
+  uid,
+  actorEmail,
+  actorRoles = [],
+  payload = {}
+}) => {
+  const user = await ensureUserFromActor({
+    uid,
+    email: actorEmail,
+    roles: actorRoles,
+    displayName: ""
+  });
+  if (!user) return null;
+  if (!isClientUser(user)) {
+    throw createHttpError(403, "Only client users can create team invites.");
+  }
+  if (isAffiliatedClientTeamMember(user)) {
+    throw createHttpError(403, "Only the primary owner can invite team members to this workspace.");
+  }
+
+  const state = buildClientTeamState({ user });
+  const normalizedEmail = String(payload?.email || "").trim().toLowerCase();
+  if (!normalizedEmail) {
+    throw createHttpError(400, "Invite email is required.");
+  }
+  if (normalizedEmail === state.owner.email) {
+    throw createHttpError(400, "Primary account owner cannot invite their own email.");
+  }
+
+  const normalizedRole = normalizeClientTeamRole(payload?.role, "manager");
+  const existingMember = state.members.find((member) => (
+    String(member?.email || "").trim().toLowerCase() === normalizedEmail
+  ));
+  if (existingMember) {
+    throw createHttpError(409, "This user is already a team member.");
+  }
+
+  const duplicatePendingInvite = state.invites.find((invite) => (
+    String(invite?.email || "").trim().toLowerCase() === normalizedEmail
+    && String(invite?.status || "").trim().toLowerCase() === "pending"
+  ));
+  if (duplicatePendingInvite) {
+    throw createHttpError(409, "A pending invite already exists for this email.");
+  }
+
+  const invite = normalizeClientTeamInviteRecord(
+    {
+      id: `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      email: normalizedEmail,
+      role: normalizedRole,
+      invitedBy: state.owner.fullName,
+      companyId: state.owner.companyId,
+      token: `CINV-${Date.now()}-${Math.random().toString(36).slice(2, 12).toUpperCase()}`,
+      expiresAt: new Date(Date.now() + (48 * 60 * 60 * 1000)).toISOString(),
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      singleUse: true
+    },
+    {
+      companyId: state.owner.companyId,
+      ownerName: state.owner.fullName
+    }
+  );
+
+  const nextInvites = sortClientTeamInvites([invite, ...state.invites]);
+  const updatedUser = await updateUserByUid(uid, {
+    $set: {
+      "clientWorkspace.teamInvites": nextInvites,
+      "clientWorkspace.teamMembers": state.members,
+      "clientWorkspace.updatedAt": new Date()
+    }
+  });
+  if (!updatedUser) return null;
+
+  const inviteUrl = buildClientTeamInviteUrl({
+    inviteBaseUrl: payload?.inviteBaseUrl,
+    invite
+  });
+  const emailDelivery = await dispatchClientTeamInviteEmail({
+    invite,
+    owner: state.owner,
+    inviteUrl
+  });
+
+  return {
+    ...buildClientTeamPayload({ user: updatedUser }),
+    invite,
+    inviteUrl,
+    emailQueued: Boolean(emailDelivery?.queued),
+    emailReason: String(emailDelivery?.reason || "").trim()
+  };
+};
+
+export const cancelClientTeamInviteByUid = async ({
+  uid,
+  actorEmail,
+  actorRoles = [],
+  inviteId = ""
+}) => {
+  const user = await ensureUserFromActor({
+    uid,
+    email: actorEmail,
+    roles: actorRoles,
+    displayName: ""
+  });
+  if (!user) return null;
+  if (!isClientUser(user)) {
+    throw createHttpError(403, "Only client users can manage team invites.");
+  }
+  if (isAffiliatedClientTeamMember(user)) {
+    throw createHttpError(403, "Only the primary owner can manage team invites for this workspace.");
+  }
+
+  const normalizedInviteId = String(inviteId || "").trim();
+  const state = buildClientTeamState({ user });
+  const targetInvite = state.invites.find((invite) => invite.id === normalizedInviteId);
+  if (!targetInvite) {
+    throw createHttpError(404, "Team invite not found.");
+  }
+  if (String(targetInvite.status || "").trim().toLowerCase() !== "pending") {
+    throw createHttpError(400, "Only pending invites can be cancelled.");
+  }
+
+  const nextInvites = state.invites.map((invite) => (
+    invite.id === normalizedInviteId
+      ? {
+        ...invite,
+        status: "cancelled",
+        cancelledAt: new Date().toISOString(),
+        reason: "owner-cancelled"
+      }
+      : invite
+  ));
+
+  const updatedUser = await updateUserByUid(uid, {
+    $set: {
+      "clientWorkspace.teamInvites": sortClientTeamInvites(nextInvites),
+      "clientWorkspace.updatedAt": new Date()
+    }
+  });
+  if (!updatedUser) return null;
+  return buildClientTeamPayload({ user: updatedUser });
+};
+
+export const updateClientTeamMemberByUid = async ({
+  uid,
+  actorEmail,
+  actorRoles = [],
+  memberId = "",
+  payload = {}
+}) => {
+  const user = await ensureUserFromActor({
+    uid,
+    email: actorEmail,
+    roles: actorRoles,
+    displayName: ""
+  });
+  if (!user) return null;
+  if (!isClientUser(user)) {
+    throw createHttpError(403, "Only client users can manage team members.");
+  }
+  if (isAffiliatedClientTeamMember(user)) {
+    throw createHttpError(403, "Only the primary owner can manage team members for this workspace.");
+  }
+
+  const normalizedMemberId = String(memberId || "").trim();
+  const state = buildClientTeamState({ user });
+  const targetMember = state.members.find((member) => member.id === normalizedMemberId);
+  if (!targetMember) {
+    throw createHttpError(404, "Team member not found.");
+  }
+  if (targetMember.isPrimaryOwner) {
+    throw createHttpError(400, "Primary owner role cannot be changed.");
+  }
+
+  const normalizedRole = normalizeClientTeamRole(payload?.role, targetMember.role || "viewer");
+  const nextMembers = state.members.map((member) => (
+    member.id === normalizedMemberId
+      ? {
+        ...member,
+        role: normalizedRole
+      }
+      : member
+  ));
+
+  const updatedUser = await updateUserByUid(uid, {
+    $set: {
+      "clientWorkspace.teamMembers": sortClientTeamMembers(nextMembers),
+      "clientWorkspace.updatedAt": new Date()
+    }
+  });
+
+  const teamMemberUser = await findUserByEmail(targetMember.email);
+  if (teamMemberUser) {
+    await updateUserByUid(teamMemberUser.uid, {
+      $set: {
+        ...buildAffiliatedClientBusinessPatch({
+          ownerUser: user,
+          memberUser: teamMemberUser,
+          role: normalizedRole,
+          joinedAt: targetMember.joinedAt
+        })
+      }
+    });
+  }
+
+  if (!updatedUser) return null;
+  return buildClientTeamPayload({ user: updatedUser });
+};
+
+export const removeClientTeamMemberByUid = async ({
+  uid,
+  actorEmail,
+  actorRoles = [],
+  memberId = ""
+}) => {
+  const user = await ensureUserFromActor({
+    uid,
+    email: actorEmail,
+    roles: actorRoles,
+    displayName: ""
+  });
+  if (!user) return null;
+  if (!isClientUser(user)) {
+    throw createHttpError(403, "Only client users can manage team members.");
+  }
+  if (isAffiliatedClientTeamMember(user)) {
+    throw createHttpError(403, "Only the primary owner can manage team members for this workspace.");
+  }
+
+  const normalizedMemberId = String(memberId || "").trim();
+  const state = buildClientTeamState({ user });
+  const targetMember = state.members.find((member) => member.id === normalizedMemberId);
+  if (!targetMember) {
+    throw createHttpError(404, "Team member not found.");
+  }
+  if (targetMember.isPrimaryOwner) {
+    throw createHttpError(400, "Primary owner cannot be removed.");
+  }
+
+  const nextMembers = state.members.filter((member) => member.id !== normalizedMemberId);
+  const updatedUser = await updateUserByUid(uid, {
+    $set: {
+      "clientWorkspace.teamMembers": sortClientTeamMembers(nextMembers),
+      "clientWorkspace.updatedAt": new Date()
+    }
+  });
+
+  const teamMemberUser = await findUserByEmail(targetMember.email);
+  if (teamMemberUser) {
+    await updateUserByUid(teamMemberUser.uid, {
+      $set: {
+        "clientWorkspace.teamAccess": {},
+        "clientWorkspace.updatedAt": new Date()
+      }
+    });
+  }
+
+  if (!updatedUser) return null;
+  return buildClientTeamPayload({ user: updatedUser });
+};
+
+export const acceptClientTeamInviteByUid = async ({
+  uid,
+  actorEmail,
+  actorRoles = [],
+  payload = {}
+}) => {
+  const normalizedToken = String(payload?.token || "").trim();
+  const normalizedCompanyId = String(payload?.companyId || "").trim();
+  const normalizedEmail = String(payload?.email || actorEmail || "").trim().toLowerCase();
+  const normalizedFullName = String(payload?.fullName || "").trim();
+
+  if (!normalizedToken || !normalizedCompanyId) {
+    throw createHttpError(400, "Invite token and company id are required.");
+  }
+  if (!normalizedEmail) {
+    throw createHttpError(400, "Invite email is required.");
+  }
+
+  const ownerUser = await findUserByClientTeamInvite({ token: normalizedToken });
+  if (!ownerUser || !isClientUser(ownerUser)) {
+    throw createHttpError(404, "Team invite not found.");
+  }
+
+  const inviteLookup = findClientTeamInviteForUser({
+    user: ownerUser,
+    token: normalizedToken,
+    companyId: normalizedCompanyId
+  });
+  if (!inviteLookup) {
+    throw createHttpError(404, "Team invite not found.");
+  }
+  if (String(inviteLookup.invite.status || "").trim().toLowerCase() !== "pending") {
+    throw createHttpError(400, "This team invite is invalid or has expired.");
+  }
+  if (normalizedEmail !== String(inviteLookup.invite.email || "").trim().toLowerCase()) {
+    throw createHttpError(403, "Use the invited email address to complete team onboarding.");
+  }
+
+  const inviteeUser = await ensureUserFromActor({
+    uid,
+    email: normalizedEmail,
+    roles: actorRoles,
+    displayName: normalizedFullName
+  });
+  if (!inviteeUser) {
+    throw createHttpError(404, "Invited user record not found.");
+  }
+  const existingTeamAccess = toPlainObject(inviteeUser?.clientWorkspace?.teamAccess, {});
+  const existingOwnerUid = String(existingTeamAccess.ownerUid || "").trim();
+  if (existingOwnerUid && existingOwnerUid !== ownerUser.uid) {
+    throw createHttpError(409, "This account already belongs to another team workspace.");
+  }
+
+  const existingMember = inviteLookup.state.members.find((member) => (
+    String(member?.email || "").trim().toLowerCase() === normalizedEmail
+  ));
+  const memberRecord = normalizeClientTeamMemberRecord(
+    {
+      id: existingMember?.id || `TM-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      email: normalizedEmail,
+      fullName: normalizedFullName || existingMember?.fullName || normalizedEmail,
+      role: inviteLookup.invite.role,
+      companyId: inviteLookup.state.owner.companyId,
+      status: "Active",
+      joinedAt: existingMember?.joinedAt || new Date().toISOString(),
+      isPrimaryOwner: false
+    },
+    {
+      companyId: inviteLookup.state.owner.companyId
+    }
+  );
+
+  const nextMembers = sortClientTeamMembers([
+    memberRecord,
+    ...inviteLookup.state.members.filter((member) => (
+      String(member?.email || "").trim().toLowerCase() !== normalizedEmail
+    ))
+  ]);
+  const acceptedAt = new Date().toISOString();
+  const nextInvites = inviteLookup.state.invites.filter((invite) => invite.id !== inviteLookup.invite.id);
+
+  await updateUserByUid(ownerUser.uid, {
+    $set: {
+      "clientWorkspace.teamMembers": nextMembers,
+      "clientWorkspace.teamInvites": sortClientTeamInvites(nextInvites),
+      "clientWorkspace.updatedAt": new Date()
+    }
+  });
+
+  const teamAccess = buildAffiliatedClientTeamAccess({
+    ownerUser,
+    role: inviteLookup.invite.role,
+    existingTeamAccess,
+    joinedAt: memberRecord.joinedAt,
+    inviteId: inviteLookup.invite.id,
+    inviteToken: inviteLookup.invite.token
+  });
+
+  await updateUserByUid(inviteeUser.uid, {
+    $set: {
+      ...buildAffiliatedClientBusinessPatch({
+        ownerUser,
+        memberUser: inviteeUser,
+        role: inviteLookup.invite.role,
+        joinedAt: memberRecord.joinedAt,
+        inviteId: inviteLookup.invite.id,
+        inviteToken: inviteLookup.invite.token
+      })
+    }
+  });
+
+  return {
+    accepted: true,
+    owner: inviteLookup.state.owner,
+    invite: {
+      ...inviteLookup.invite,
+      status: "accepted",
+      acceptedAt
+    },
+    member: memberRecord,
+    teamAccess
+  };
 };
 
 export const listClientManagementClientsForAdmin = async ({ query = {} }) => {

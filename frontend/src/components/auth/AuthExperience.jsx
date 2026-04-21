@@ -197,6 +197,8 @@ function AuthExperience({
   onVerifyOtp,
   onResendOtp,
   onCancelOtp,
+  signupPrefill = null,
+  signupContextNotice = '',
 }) {
   const [loginForm, setLoginForm] = useState({ email: '', password: '', remember: false })
   const [signupForm, setSignupForm] = useState({
@@ -243,6 +245,8 @@ function AuthExperience({
   const actionCode = typeof window !== 'undefined' ? String(new URLSearchParams(window.location.search || '').get('oobCode') || '').trim() : ''
   const processedResetCodeRef = useRef('')
   const processedVerificationCodeRef = useRef('')
+  const signupInviteEmail = String(signupPrefill?.email || '').trim().toLowerCase()
+  const isInviteSignup = mode === 'signup' && Boolean(signupPrefill?.lockEmail && signupInviteEmail)
   const verificationTargetEmail = String(verificationEmail || signupForm.email || loginForm.email || '').trim().toLowerCase()
   const strength = getPasswordStrength(resetForm.password)
 
@@ -306,6 +310,21 @@ function AuthExperience({
     })
   }, [mode, pendingSocialPrompt, socialPrompt.open])
 
+  useEffect(() => {
+    if (mode !== 'signup' || !signupInviteEmail) return
+    setSignupForm((previous) => {
+      if (String(previous.email || '').trim().toLowerCase() === signupInviteEmail) return previous
+      return {
+        ...previous,
+        email: signupInviteEmail,
+      }
+    })
+    setSignupFieldErrors((previous) => (
+      previous.email ? { ...previous, email: '' } : previous
+    ))
+    setSignupError('')
+  }, [mode, signupInviteEmail])
+
   const navigate = (nextMode) => {
     setLoginError('')
     setSignupError('')
@@ -326,7 +345,7 @@ function AuthExperience({
     setMode(nextMode)
   }
 
-  const socialBlock = (mode === 'login' || mode === 'signup') ? (
+  const socialBlock = (mode === 'login' || (mode === 'signup' && !isInviteSignup)) ? (
     <>
       <button type="button" onClick={() => void (async () => {
         setSocialLoading('google')
@@ -396,6 +415,7 @@ function AuthExperience({
           {mode === 'signup' ? (
             <>
               {socialBlock}
+              <Notice type="info" message={signupContextNotice} />
               <Notice message={signupError} />
               <form className="space-y-6" onSubmit={async (event) => {
                 event.preventDefault()
@@ -429,7 +449,13 @@ function AuthExperience({
                 }
                 setSignupError('')
                 setIsSignupLoading(true)
-                const result = await onSignup({ ...signupForm, email, phoneNumber: normalizedPhoneNumber })
+                const result = await onSignup({
+                  ...signupForm,
+                  email,
+                  phoneNumber: normalizedPhoneNumber,
+                  teamInviteToken: String(signupPrefill?.inviteToken || '').trim(),
+                  teamInviteCompanyId: String(signupPrefill?.companyId || '').trim(),
+                })
                 if (!result?.ok) {
                   const message = String(result?.message || 'Unable to create account.').trim()
                   const normalizedMessage = message.toLowerCase()
@@ -449,7 +475,7 @@ function AuthExperience({
                   <Field label="First Name" icon={Shield} error={signupFieldErrors.firstName} required><input value={signupForm.firstName} onChange={(e) => { setSignupError(''); setSignupFieldErrors((previous) => ({ ...previous, firstName: '' })); setSignupForm((p) => ({ ...p, firstName: e.target.value })) }} placeholder="Enter your first name" className="h-full w-full bg-transparent text-sm outline-none placeholder:text-slate-400" /></Field>
                   <Field label="Last Name" icon={Shield} error={signupFieldErrors.lastName} required><input value={signupForm.lastName} onChange={(e) => { setSignupError(''); setSignupFieldErrors((previous) => ({ ...previous, lastName: '' })); setSignupForm((p) => ({ ...p, lastName: e.target.value })) }} placeholder="Enter your last name" className="h-full w-full bg-transparent text-sm outline-none placeholder:text-slate-400" /></Field>
                   <div className="md:col-span-2"><Field label="Other Name" icon={Shield} error={signupFieldErrors.otherNames}><input value={signupForm.otherNames} onChange={(e) => { setSignupError(''); setSignupFieldErrors((previous) => ({ ...previous, otherNames: '' })); setSignupForm((p) => ({ ...p, otherNames: e.target.value })) }} placeholder="Enter other name" className="h-full w-full bg-transparent text-sm outline-none placeholder:text-slate-400" /></Field></div>
-                  <Field label="Work Email" icon={Mail} error={signupFieldErrors.email} required><input value={signupForm.email} onChange={(e) => { setSignupError(''); setSignupFieldErrors((previous) => ({ ...previous, email: '' })); setSignupForm((p) => ({ ...p, email: e.target.value })) }} placeholder="name@company.com" className="h-full w-full bg-transparent text-sm outline-none placeholder:text-slate-400" /></Field>
+                  <Field label="Work Email" icon={Mail} error={signupFieldErrors.email} required><input value={signupForm.email} readOnly={isInviteSignup} onChange={(e) => { if (isInviteSignup) return; setSignupError(''); setSignupFieldErrors((previous) => ({ ...previous, email: '' })); setSignupForm((p) => ({ ...p, email: e.target.value })) }} placeholder="name@company.com" className={`h-full w-full bg-transparent text-sm outline-none placeholder:text-slate-400 ${isInviteSignup ? 'cursor-not-allowed text-slate-500' : ''}`} /></Field>
                   <Field label="Phone Number" icon={Phone} error={signupFieldErrors.phoneNumber} required><input type="text" inputMode="numeric" value={signupForm.phoneNumber} onChange={(e) => { setSignupError(''); setSignupFieldErrors((previous) => ({ ...previous, phoneNumber: '' })); setSignupForm((p) => ({ ...p, phoneNumber: e.target.value.replace(/\D/g, '').slice(0, 11) })) }} placeholder="08012345678" className="h-full w-full bg-transparent text-sm outline-none placeholder:text-slate-400" /></Field>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">

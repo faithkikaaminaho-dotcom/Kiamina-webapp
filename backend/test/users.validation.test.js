@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildAdminClientManagementUpdatePayload,
   buildAdminDashboardUpdatePayload,
+  buildAdminStaffUpdatePayload,
   buildClientDashboardUpdatePayload,
   buildClientProfileUpdatePayload,
   buildClientWorkspaceUpdatePayload,
@@ -54,13 +55,23 @@ test("users: admin dashboard payload builds support leads and newsletters", () =
   const { errors, payload } = buildAdminDashboardUpdatePayload({
     defaultLandingPage: "support-leads",
     supportLeads: [{ email: "lead@example.com", status: "new" }],
-    newsletters: [{ email: "newsletter@example.com", status: "subscribed" }]
+    newsletters: [{ email: "newsletter@example.com", status: "subscribed" }],
+    workSessions: [{ id: "ws_1", adminEmail: "admin@example.com" }],
+    notificationDrafts: [{ id: "draft_1", title: "Draft title" }],
+    scheduledNotifications: [{ id: "schedule_1", status: "Scheduled" }],
+    sentNotifications: [{ id: "sent_1", title: "Sent title" }],
+    trashEntries: [{ id: "trash_1", entityType: "notification-draft" }]
   });
 
   assert.deepEqual(errors, []);
   assert.equal(payload["adminDashboard.defaultLandingPage"], "support-leads");
   assert.equal(payload["adminDashboard.supportLeads"].length, 1);
   assert.equal(payload["adminDashboard.newsletters"].length, 1);
+  assert.equal(payload["adminDashboard.workSessions"].length, 1);
+  assert.equal(payload["adminDashboard.notificationDrafts"].length, 1);
+  assert.equal(payload["adminDashboard.scheduledNotifications"].length, 1);
+  assert.equal(payload["adminDashboard.sentNotifications"].length, 1);
+  assert.equal(payload["adminDashboard.trashEntries"].length, 1);
   assert.equal(payload["adminDashboard.stats.openSupportLeads"], 1);
   assert.equal(payload["adminDashboard.stats.newsletterSubscribers"], 1);
 });
@@ -108,4 +119,23 @@ test("users: admin client management payload normalizes verification and tags", 
   assert.equal(payload["verification.status"], "verified");
   assert.equal(payload["clientWorkspace.statusControl.assignedToUid"], "area_admin_1");
   assert.deepEqual(payload["clientWorkspace.statusControl.tags"], ["priority", "vat"]);
+});
+
+test("users: admin staff payload normalizes admin access aliases", () => {
+  const { errors, payload } = buildAdminStaffUpdatePayload({
+    adminAccess: {
+      adminLevel: "area-accountant",
+      adminPermissions: ["manage_admins", "view_clients", "manage_admin_roles"],
+      mustChangePassword: true
+    }
+  });
+
+  assert.deepEqual(errors, []);
+  assert.equal(payload["adminAccess.adminLevel"], "area_accountant");
+  assert.deepEqual(payload["adminAccess.adminPermissions"], [
+    "manage_users",
+    "manage_admin_roles",
+    "view_businesses"
+  ]);
+  assert.equal(payload["adminAccess.mustChangePassword"], true);
 });

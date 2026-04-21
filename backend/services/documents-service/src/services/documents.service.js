@@ -5,6 +5,8 @@ import {
   findDocumentById,
   listDocumentStorageRefsByOwner,
   listDocumentsByOwner,
+  reassignDocumentsByOwner,
+  reassignStoredAssetsByOwner,
   summarizeDocumentsByOwner,
   updateDocumentById,
   updateDocumentStatus
@@ -33,3 +35,24 @@ export const deleteDocument = async (id) => deleteDocumentById(id);
 
 export const deleteDocumentsForOwner = async (ownerUserId) =>
   deleteDocumentsByOwner(ownerUserId);
+
+export const reassignDocumentsForOwner = async ({
+  fromOwnerUserId,
+  toOwnerUserId
+}) => {
+  const [documentsResult, storageAssetsResult] = await Promise.all([
+    reassignDocumentsByOwner({
+      fromOwnerUserId,
+      toOwnerUserId
+    }),
+    reassignStoredAssetsByOwner({
+      fromOwnerUserId,
+      toOwnerUserId
+    })
+  ]);
+
+  return {
+    migratedDocuments: Number(documentsResult?.modifiedCount || 0),
+    migratedStorageObjects: Number(storageAssetsResult?.modifiedCount || 0)
+  };
+};

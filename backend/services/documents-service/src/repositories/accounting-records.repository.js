@@ -123,6 +123,19 @@ export const deleteAccountingRecordById = async (id) =>
 export const deleteAccountingRecordsByOwner = async (ownerUserId) =>
   AccountingRecord.deleteMany({ ownerUserId });
 
+export const reassignAccountingRecordsByOwner = async ({
+  fromOwnerUserId,
+  toOwnerUserId
+}) =>
+  AccountingRecord.updateMany(
+    { ownerUserId: String(fromOwnerUserId || "").trim() },
+    {
+      $set: {
+        ownerUserId: String(toOwnerUserId || "").trim()
+      }
+    }
+  );
+
 export const listAccountingRecords = async ({
   ownerUserId,
   category,
