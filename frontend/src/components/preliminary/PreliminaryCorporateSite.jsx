@@ -6,41 +6,30 @@ import { ClientSupportWidgetExperience } from '../client/support/ClientSupportEx
 import { apiFetch } from '../../utils/apiClient'
 import { registerNewsletterSubscriberLead } from '../../utils/supportCenter'
 import {
-  ChevronDown,
-  Rows3,
-  ArrowRight,
   ArrowUp,
-  X,
-  ShieldCheck,
-  Globe2,
-  CloudCog,
-  FileBarChart2,
-  CalendarDays,
-  Clock3,
-  UserCircle2,
-  ArrowLeft,
-  MapPin,
-  Mail,
-  Phone,
-  Building2,
-  Search,
-  TrendingUp,
-  Users,
-  Award,
-  Target,
-  Lightbulb,
-  CheckCircle2,
   BarChart3,
-  PieChart,
-  Wallet,
-  Calculator,
+  BookOpen,
+  Briefcase,
+  Building2,
+  CalendarDays,
+  ChevronDown,
+  Clock3,
   FileText,
-  CreditCard,
+  Globe2,
+  Hammer,
   Landmark,
-  Scale,
-  Filter,
-  SortAsc,
-  AlertTriangle,
+  Laptop,
+  LineChart,
+  Mail,
+  MapPin,
+  Phone,
+  Rocket,
+  Rows3,
+  Search,
+  ShieldCheck,
+  Users,
+  Wallet,
+  X,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -58,330 +47,534 @@ const REGION_ITEMS = [
   { id: 'united-states', label: 'United States', flag: '/img/flag-united-states.svg' },
   { id: 'united-kingdom', label: 'United Kingdom', flag: '/img/flag-united-kingdom.svg' },
   { id: 'australia', label: 'Australia', flag: '/img/flag-australia.svg' },
+  { id: 'ireland', label: 'Ireland', flag: '/img/flag-ireland.svg' },
 ]
 
 const REGION_ID_SET = new Set(REGION_ITEMS.map((item) => item.id))
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-const SERVICE_PILLARS = [
-  'Bookkeeping',
-  'Financial Reporting',
-  'Management Reporting',
-  'CFO Consulting',
-  'Financial Modeling',
-  'Payroll Processing',
-  'Accounts Payable & Receivable Management',
-  'Tax Compliance',
-]
-
-const INDUSTRIES = [
-  { name: 'Oil & Gas', image: 'https://images.unsplash.com/photo-1513828583688-c52646db42da?w=600', fallback: '/img/industry-oil-gas.svg' },
-  { name: 'Technology', image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=600', fallback: '/img/industry-technology.svg' },
-  { name: 'Healthcare', image: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600', fallback: '/img/industry-healthcare.svg' },
-  { name: 'Maritime', image: 'https://images.unsplash.com/photo-1494412651409-8963ce7935a7?w=600', fallback: '/img/industry-maritime.svg' },
-  { name: 'Real Estate', image: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=600', fallback: '/img/industry-real-estate.svg' },
-  { name: 'Professional Services', image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?w=600', fallback: '/img/industry-professional-services.svg' },
-  { name: 'Nonprofits', image: 'https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=600', fallback: '/img/industry-nonprofits.svg' },
-  { name: 'Education', image: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=600', fallback: '/img/industry-education.svg' },
-  { name: 'Ecommerce', image: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600', fallback: '/img/industry-ecommerce.svg' },
-  { name: 'Digital Media', image: 'https://images.unsplash.com/photo-1492725764893-90b379c2b6e7?w=600', fallback: '/img/industry-digital-media.svg' },
-  { name: 'Entertainment', image: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=600', fallback: '/img/industry-entertainment.svg' },
-]
-
-const SOFTWARE_EXPERTISE = [
-  { name: 'QuickBooks', logo: 'https://cdn.simpleicons.org/quickbooks/2CA01C', fallback: '/img/logo-quickbooks.svg' },
-  { name: 'Sage', logo: 'https://cdn.simpleicons.org/sage/00D639', fallback: '/img/logo-sage.svg' },
-  { name: 'Xero', logo: 'https://cdn.simpleicons.org/xero/13B5EA', fallback: '/img/logo-xero.svg' },
-  { name: 'Zoho Books', logo: 'https://cdn.simpleicons.org/zoho/EA4335', fallback: '/img/logo-zoho-books.svg' },
-  { name: 'Wave', logo: 'https://cdn.simpleicons.org/waves/0055FF', fallback: '/img/logo-wave.svg' },
-  { name: 'Microsoft Dynamics', logo: 'https://cdn.simpleicons.org/microsoftdynamics365/0B53CE', fallback: '/img/logo-microsoft-dynamics.svg' },
-  { name: 'NetSuite', logo: 'https://cdn.simpleicons.org/oracle/F80000', fallback: '/img/logo-netsuite.svg' },
-  { name: 'Dext', logo: 'https://cdn.simpleicons.org/diaspora/6B4CFF', fallback: '/img/logo-dext.svg' },
-]
-
-const HERO_BACKGROUNDS = {
-  home: 'https://unsplash.com/photos/Q80LYxv_Tbs/download?force=true&w=2200',
-  about: 'https://unsplash.com/photos/VpcgTEKerEQ/download?force=true&w=2200',
-  services: 'https://unsplash.com/photos/ftCWdZOFZqo/download?force=true&w=2200',
-  insights: 'https://unsplash.com/photos/HG9M8M29Ig4/download?force=true&w=2200',
-  careers: 'https://unsplash.com/photos/vzfgh3RAPzM/download?force=true&w=2200',
-  contact: 'https://unsplash.com/photos/n95VMLxqM2I/download?force=true&w=2200',
+const REGION_ID_BY_COUNTRY_CODE = {
+  AU: 'australia',
+  CA: 'canada',
+  GB: 'united-kingdom',
+  IE: 'ireland',
+  NG: 'nigeria',
+  UK: 'united-kingdom',
+  US: 'united-states',
 }
+const REGION_ID_BY_COUNTRY_NAME = {
+  australia: 'australia',
+  canada: 'canada',
+  ireland: 'ireland',
+  nigeria: 'nigeria',
+  'united kingdom': 'united-kingdom',
+  'united states': 'united-states',
+  'united states of america': 'united-states',
+}
+const REGION_ID_BY_TIME_ZONE = {
+  'Africa/Lagos': 'nigeria',
+  'Australia/Adelaide': 'australia',
+  'Australia/Brisbane': 'australia',
+  'Australia/Broken_Hill': 'australia',
+  'Australia/Darwin': 'australia',
+  'Australia/Eucla': 'australia',
+  'Australia/Hobart': 'australia',
+  'Australia/Lindeman': 'australia',
+  'Australia/Lord_Howe': 'australia',
+  'Australia/Melbourne': 'australia',
+  'Australia/Perth': 'australia',
+  'Australia/Sydney': 'australia',
+  'Europe/Dublin': 'ireland',
+  'Europe/London': 'united-kingdom',
+}
+const CANADA_TIME_ZONES = new Set([
+  'America/Atikokan',
+  'America/Blanc-Sablon',
+  'America/Cambridge_Bay',
+  'America/Creston',
+  'America/Dawson',
+  'America/Dawson_Creek',
+  'America/Edmonton',
+  'America/Fort_Nelson',
+  'America/Glace_Bay',
+  'America/Goose_Bay',
+  'America/Halifax',
+  'America/Inuvik',
+  'America/Iqaluit',
+  'America/Moncton',
+  'America/Rankin_Inlet',
+  'America/Regina',
+  'America/Resolute',
+  'America/St_Johns',
+  'America/Swift_Current',
+  'America/Toronto',
+  'America/Vancouver',
+  'America/Whitehorse',
+  'America/Winnipeg',
+  'America/Yellowknife',
+])
+const UNITED_STATES_TIME_ZONES = new Set([
+  'America/Adak',
+  'America/Anchorage',
+  'America/Boise',
+  'America/Chicago',
+  'America/Denver',
+  'America/Detroit',
+  'America/Indiana/Indianapolis',
+  'America/Indiana/Knox',
+  'America/Indiana/Marengo',
+  'America/Indiana/Petersburg',
+  'America/Indiana/Tell_City',
+  'America/Indiana/Vevay',
+  'America/Indiana/Vincennes',
+  'America/Indiana/Winamac',
+  'America/Juneau',
+  'America/Kentucky/Louisville',
+  'America/Kentucky/Monticello',
+  'America/Los_Angeles',
+  'America/Menominee',
+  'America/Metlakatla',
+  'America/New_York',
+  'America/Nome',
+  'America/North_Dakota/Beulah',
+  'America/North_Dakota/Center',
+  'America/North_Dakota/New_Salem',
+  'America/Phoenix',
+  'America/Sitka',
+  'America/Yakutat',
+  'Pacific/Honolulu',
+])
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const WEBSITE_ASSET_BASE = '/img/kiamina-website'
+const CALENDAR_BOOKING_URL = 'https://calendar.app.google/Ph7DtaeNiKSBq7B69'
+const CONTACT_CONSULTATION_CALENDAR_ID = 'contact-consultation-calendar'
+const WEBSITE_ANALYTICS_SESSION_STORAGE_KEY = 'kiaminaWebsiteAnalyticsSessionId'
+const REGION_DETECTION_TIMEOUT_MS = 2200
 
 const SERVICES = [
   {
-    name: 'Bookkeeping',
-    icon: FileText,
-    image: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800',
-    summary: 'Policy-aligned transaction management that keeps your ledger accurate and month-end close predictable.',
-    deliverables: [
-      'Daily transaction posting and coding',
-      'Bank and control account reconciliations',
-      'Ledger hygiene and chart-of-accounts governance',
+    title: 'Bookkeeping',
+    slug: 'bookkeeping',
+    problem: 'Disorganized records create blind spots, slow reporting, and increase compliance risk.',
+    outcome: 'Structured, audit-ready records that create control and confidence.',
+    fit: 'Growing businesses and nonprofits that need a reliable financial foundation.',
+    intro: 'Structured bookkeeping is the operating layer behind reliable reporting, clean compliance, and better decision-making.',
+    bullets: [
+      'Monthly bookkeeping workflows with disciplined close processes',
+      'Chart of accounts aligned with reporting needs',
+      'Transaction classification and reconciliation',
     ],
-    outcomes: [
-      'Reliable records for reporting and audits',
-      'Lower reconciliation backlog',
-      'Stronger finance team accountability',
-    ],
+    Icon: BookOpen,
   },
   {
-    name: 'Financial Reporting',
-    icon: BarChart3,
-    image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800',
-    summary: 'Executive and statutory reports prepared with audit-ready support and clear compliance posture.',
-    deliverables: [
-      'Monthly and annual financial statements',
-      'Disclosure and notes preparation support',
-      'Variance and performance commentary',
+    title: 'Payroll Processing',
+    slug: 'payroll-processing',
+    problem: 'Manual or poorly managed payroll creates compliance risks, errors, and employee dissatisfaction.',
+    outcome: 'Accurate, timely, and compliant payroll that builds trust and meets statutory requirements.',
+    fit: 'Businesses and nonprofits with employees requiring structured payroll management.',
+    intro: 'Payroll processing ensures employees are paid accurately while maintaining compliance and proper documentation.',
+    bullets: [
+      'End-to-end payroll processing and payslip generation',
+      'PAYE, pension, and statutory deductions',
+      'Compliance with Nigerian payroll regulations',
     ],
-    outcomes: [
-      'Higher board and investor confidence',
-      'IFRS / GAAP / US GAAP alignment',
-      'Improved regulatory readiness',
-    ],
+    Icon: Wallet,
   },
   {
-    name: 'Management Reporting',
-    icon: PieChart,
-    image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800',
-    summary: 'Decision-grade management packs with KPI tracking, trend visibility, and leadership-focused narrative.',
-    deliverables: [
-      'Management dashboard design',
-      'Departmental performance scorecards',
-      'Monthly executive reporting packs',
-    ],
-    outcomes: [
-      'Faster decision cycles',
-      'Better performance governance',
-      'Clear ownership across teams',
-    ],
+    title: 'Financial Reporting',
+    slug: 'financial-reporting',
+    problem: 'Delayed or unclear reporting makes timely decision-making difficult.',
+    outcome: 'Decision-ready reports that show performance clearly.',
+    fit: 'Executives who need visibility without chasing numbers.',
+    intro: 'Financial reporting should clarify performance, risk, and priorities.',
+    bullets: ['Monthly financial statements', 'Management-ready reporting', 'Structured reporting support'],
+    Icon: FileText,
   },
   {
-    name: 'CFO Consulting',
-    icon: Wallet,
-    image: 'https://images.unsplash.com/photo-1553484771-371a605b060b?w=800',
-    summary: 'Senior finance guidance for founders and leadership teams needing structured strategic financial control.',
-    deliverables: [
-      'Finance operating model advisory',
-      'Policy and internal control architecture',
-      'Board and leadership finance advisory',
-    ],
-    outcomes: [
-      'Stronger governance maturity',
-      'Structured scalability for growth',
-      'Reduced strategic finance risk',
-    ],
+    title: 'Management Reporting',
+    slug: 'management-reporting',
+    problem: 'Data exists, but not in a form leaders can act on quickly.',
+    outcome: 'Clear insight into trends and performance drivers.',
+    fit: 'CEOs, founders, and decision-makers.',
+    intro: 'Management reporting translates financial data into actionable insight.',
+    bullets: ['Performance reporting', 'Trend and variance analysis', 'Executive-ready formats'],
+    Icon: BarChart3,
   },
   {
-    name: 'Financial Modeling',
-    icon: Calculator,
-    image: 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=800',
-    summary: 'Scenario-based financial models for funding, pricing, budgeting, and expansion decisions.',
-    deliverables: [
-      'Three-statement integrated models',
-      'Sensitivity and scenario analysis',
-      'Investment and growth option modeling',
-    ],
-    outcomes: [
-      'Clear view of risk and return',
-      'Investor-ready planning outputs',
-      'More disciplined capital allocation',
-    ],
+    title: 'Accounts Receivable & Payable',
+    slug: 'receivables-payables',
+    problem: 'Weak payables and receivables control disrupts liquidity.',
+    outcome: 'Improved cash flow and financial discipline.',
+    fit: 'Businesses handling recurring transactions.',
+    intro: 'Cash discipline depends on structured receivables and payables management.',
+    bullets: ['Receivables tracking', 'Payables scheduling', 'Cash cycle management'],
+    Icon: Briefcase,
   },
   {
-    name: 'Payroll Processing',
-    icon: CreditCard,
-    image: 'https://images.unsplash.com/photo-1554224154-22dec7ec8818?w=800',
-    summary: 'Accurate payroll execution with statutory deductions and remittance control.',
-    deliverables: [
-      'Payroll cycle processing and checks',
-      'Statutory deduction and remittance schedules',
-      'Payroll journals and reconciliation outputs',
-    ],
-    outcomes: [
-      'Reduced payroll errors',
-      'Improved employee trust',
-      'Consistent compliance posture',
-    ],
+    title: 'CFO Consulting',
+    slug: 'cfo-consulting',
+    problem: 'Growing organizations need strategic finance support without full-time CFO cost.',
+    outcome: 'Executive-level financial insight for better decisions.',
+    fit: 'Growth-stage businesses and nonprofits.',
+    intro: 'CFO consulting provides leadership-level financial guidance.',
+    bullets: ['Strategic financial oversight', 'Decision support', 'Financial structure advisory'],
+    Icon: Users,
   },
   {
-    name: 'Accounts Payable & Receivable Management',
-    icon: Landmark,
-    image: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800',
-    summary: 'Working-capital discipline through structured payables and receivables operations.',
-    deliverables: [
-      'Payables workflow and payment governance',
-      'Receivables aging and follow-up cadence',
-      'Cash conversion monitoring dashboards',
-    ],
-    outcomes: [
-      'Improved liquidity stability',
-      'Lower overdue exposure',
-      'Predictable cash planning',
-    ],
+    title: 'Financial Modelling',
+    slug: 'financial-modelling',
+    problem: 'Lack of structured projections limits planning and investment decisions.',
+    outcome: 'Clear financial projections for growth and planning.',
+    fit: 'Businesses and nonprofits planning expansion or funding.',
+    intro: 'Financial modelling supports planning, forecasting, and investment decisions.',
+    bullets: ['Forecasting and projections', 'Scenario analysis', 'Investment modelling'],
+    Icon: LineChart,
   },
   {
-    name: 'Tax Compliance',
-    icon: Scale,
-    image: 'https://images.unsplash.com/photo-1554224154-26032ffc0d07?w=800',
-    summary: 'End-to-end tax compliance execution to reduce penalties and improve regulatory confidence.',
-    deliverables: [
-      'Tax calendar ownership and filing support',
-      'Tax computation and documentation',
-      'Regulatory query and audit response support',
-    ],
-    outcomes: [
-      'Lower non-compliance risk',
-      'Fewer penalties and disruptions',
-      'Stronger compliance governance',
-    ],
+    title: 'Tax Compliance',
+    slug: 'tax-compliance',
+    problem: 'Regulatory complexity creates exposure and penalties.',
+    outcome: 'Structured compliance and reduced risk.',
+    fit: 'Organizations operating under regulatory requirements.',
+    intro: 'Tax compliance should be controlled and predictable.',
+    bullets: ['Tax filings and reporting', 'Regulatory compliance', 'Risk reduction'],
+    Icon: ShieldCheck,
+  },
+]
+
+const INDUSTRIES = [
+  {
+    title: 'Oil & Gas',
+    body: 'Support for complex cost structures, regulatory requirements, and reporting needs across capital-intensive operations.',
+    Icon: Building2,
+  },
+  {
+    title: 'Real Estate',
+    body: 'Financial visibility for project-based operations, asset performance, and cash flow planning.',
+    Icon: Building2,
+  },
+  {
+    title: 'ICT',
+    body: 'Scalable finance support for fast-moving technology businesses that need clear reporting and operational structure.',
+    Icon: Laptop,
+  },
+  {
+    title: 'Construction',
+    body: 'Control across contracts, project costs, and financial reporting requirements for execution-heavy businesses.',
+    Icon: Hammer,
+  },
+  {
+    title: 'Nonprofits',
+    body: 'Transparent reporting, fund accountability, and structured compliance support for mission-driven organizations.',
+    Icon: Landmark,
+  },
+  {
+    title: 'Other Service Organizations',
+    body: 'Financial systems and reporting clarity for service-led businesses seeking stronger control and profitability insight.',
+    Icon: Briefcase,
+  },
+]
+
+const DIFFERENTIATORS = [
+  {
+    title: 'Strategic, not clerical',
+    body: 'Financial reporting built to inform growth decisions, not simply record transactions.',
+    Icon: Search,
+  },
+  {
+    title: 'Multi-country capability',
+    body: 'Remote service delivery across Nigeria, Canada, United States, United Kingdom, Australia, and Ireland with consistent standards and professional execution.',
+    Icon: Globe2,
+  },
+  {
+    title: 'Precision by design',
+    body: 'Structured workflows, reporting discipline, and reliable financial controls.',
+    Icon: ShieldCheck,
+  },
+  {
+    title: 'Sector-aware delivery',
+    body: 'Financial systems shaped around the realities of complex industries and operating models.',
+    Icon: Briefcase,
+  },
+]
+
+const PROCESS_STEPS = [
+  {
+    title: 'Book Consultation',
+    body: 'Choose a convenient time using the calendar below to schedule your consultation.',
+    Icon: CalendarDays,
+  },
+  {
+    title: 'Financial Assessment',
+    body: 'Review your current reporting, systems, gaps, and priorities.',
+    Icon: Search,
+  },
+  {
+    title: 'Strategy & Execution',
+    body: 'Implement the right financial processes, controls, and reporting structure.',
+    Icon: Rocket,
+  },
+  {
+    title: 'Ongoing Reporting & Advisory',
+    body: 'Maintain visibility through continuous reporting and strategic support.',
+    Icon: LineChart,
+  },
+]
+
+const TESTIMONIALS = [
+  {
+    text: 'Kiamina Accounting Services has been consistently professional, reliable, and detail-oriented. Their clear communication and timely support significantly improved how we manage our finances and maintain compliance.',
+    company: 'Mozisha International Limited',
+    country: 'Nigeria',
+    tag: 'Nigeria',
+    logo: `${WEBSITE_ASSET_BASE}/logos/mozisha.png`,
+  },
+  {
+    text: 'Kiamina delivered accurate and timely financial reports for our UK Companies House and HMRC filings, ensuring full compliance with micro-entities requirements. Their professionalism and precision stood out.',
+    company: 'FUTEC Engineering Limited',
+    country: 'United Kingdom',
+    tag: 'UK',
+    logo: `${WEBSITE_ASSET_BASE}/logos/futec.png`,
   },
 ]
 
 const INSIGHTS = [
   {
-    slug: 'payroll-made-simple-for-smes-and-nonprofits',
-    title: 'Payroll Made Simple: A Step-by-Step Guide for SMEs and Nonprofits',
-    excerpt: 'A practical control model for payroll governance: role segregation, payroll cut-off discipline, statutory checks, and post-run review.',
-    body: [
-      'Most payroll errors come from weak process ownership, not weak software. The fastest path to payroll stability is to establish role ownership across HR, finance, and approvals.',
-      'High-performing SMEs use a recurring payroll calendar with locked cut-off dates, a pre-run validation checklist, and post-run variance analysis. This ensures compliance and protects employee trust.',
-      'For nonprofits, payroll governance must also map to grant rules and restricted-fund requirements. Combining payroll controls with fund accountability avoids reporting misstatements.',
-    ],
-    author: 'Kiamina Advisory Team',
-    category: 'Payroll Governance',
-    readTime: '7 min read',
-    publishedAt: '2026-03-02T09:00:00+01:00',
-    cover: 'https://unsplash.com/photos/HG9M8M29Ig4/download?force=true&w=1200',
-  },
-  {
-    slug: 'five-costly-accounting-mistakes-smes-make',
-    title: '5 Costly Accounting Mistakes SMEs Make',
-    excerpt: 'Common breakdowns include weak reconciliations, delayed reporting cycles, poor evidence trails, and fragmented accounting systems.',
-    body: [
-      'SMEs often under-invest in chart-of-accounts structure, which creates reporting noise and weak monthly close quality.',
-      'Delayed reconciliations and incomplete support schedules raise audit risk and distort management decisions. Regular close discipline is non-negotiable.',
-      'Teams that combine policy documentation, system controls, and KPI-based management reporting build faster investor and lender confidence.',
-    ],
-    author: 'Kiamina Accounting Services',
-    category: 'SME Accounting Controls',
+    slug: 'costly-accounting-mistakes-nigerian-smes',
+    title: '5 Costly Accounting Mistakes Nigerian SMEs Make',
+    category: 'SME Accounting',
     readTime: '6 min read',
-    publishedAt: '2026-03-02T11:30:00+01:00',
-    cover: 'https://unsplash.com/photos/glRqyWJgUeY/download?force=true&w=1200',
-  },
-  {
-    slug: 'critical-fund-reporting-mistakes-nonprofits-must-avoid',
-    title: '5 Critical Fund Reporting Mistakes Nonprofits Must Avoid',
-    excerpt: 'Restricted-fund tracking gaps, weak donor-condition mapping, and poor documentation can materially damage trust and compliance posture.',
-    body: [
-      'Nonprofits lose reporting credibility when restricted and unrestricted funds are not strictly segmented in their chart and reporting packs.',
-      'Donor-condition mapping must be documented at intake and tracked through disbursement. Missing this step increases compliance risk and weakens board oversight.',
-      'A monthly fund reconciliation and grant utilization report provides transparency for trustees, donors, and regulators.',
-    ],
-    author: 'Kiamina Nonprofit Advisory Desk',
-    category: 'Nonprofit Reporting',
-    readTime: '8 min read',
-    publishedAt: '2026-03-02T14:15:00+01:00',
-    cover: 'https://unsplash.com/photos/L85a1k-XqH8/download?force=true&w=1200',
-  },
-]
-
-const TRUST_INDICATORS = [
-  {
-    id: 'cloud',
-    title: 'Cloud-Enabled Systems',
-    detail: 'Real-time collaboration, audit trails, and secure access controls.',
-    metric: '24/7',
-    metricLabel: 'Operational visibility',
-    Icon: CloudCog,
-  },
-  {
-    id: 'standards',
-    title: 'IFRS / GAAP Alignment',
-    detail: 'Reporting frameworks structured for compliance-grade decision support.',
-    metric: '3',
-    metricLabel: 'Major standards covered',
-    Icon: FileBarChart2,
-  },
-  {
-    id: 'cross-border',
-    title: 'Cross-Border Compliance Expertise',
-    detail: 'Consistent advisory delivery across 5 strategic regions.',
-    metric: '5',
-    metricLabel: 'Global operating regions',
-    Icon: Globe2,
-  },
-  {
-    id: 'controls',
-    title: 'Structured Financial Controls',
-    detail: 'Policy-backed workflows designed to reduce risk and improve accuracy.',
-    metric: '99%',
-    metricLabel: 'Reporting discipline target',
-    Icon: ShieldCheck,
-  },
-]
-
-const REVEAL_HIDDEN_CLASS = 'opacity-0 translate-y-5'
-const REVEAL_VISIBLE_CLASS = 'opacity-100 translate-y-0'
-
-function Reveal({ children, className = '', delayMs = 0 }) {
-  const elementRef = useRef(null)
-  const [isVisible, setIsVisible] = useState(false)
-
-  useEffect(() => {
-    const node = elementRef.current
-    if (!node) return undefined
-
-    if (!('IntersectionObserver' in window)) {
-      setIsVisible(true)
-      return undefined
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setIsVisible(true)
-            observer.unobserve(entry.target)
-          }
-        })
+    summary: 'Avoidable accounting errors can weaken cash flow, distort reporting, create compliance risk, and limit growth. This resource outlines five common mistakes and how SMEs can fix them.',
+    sections: [
+      {
+        heading: 'Introduction',
+        body: 'Many SMEs in Nigeria struggle not because of poor products or services, but because of common accounting errors. Neglecting accounting can create serious cash flow problems, penalties, and missed opportunities for growth and investment.',
       },
-      { threshold: 0.16 },
+      {
+        heading: 'Mistake 1: Mixing Personal and Business Finances',
+        body: 'Always maintain a separate business bank account. Mixing personal and business transactions leads to disorganized records, distorted profit calculations, and unnecessary difficulty during tax reporting.',
+      },
+      {
+        heading: 'Mistake 2: Not Keeping Proper Financial Records',
+        body: 'Accurate records are the foundation of reliable reporting and informed decision-making.',
+        bullets: [
+          'Maintain receipts, invoices, and bank statements in an organized manner.',
+          'Use digital bookkeeping tools to improve consistency and save time.',
+          'Ensure transactions are properly categorized and documented.',
+        ],
+      },
+      {
+        heading: 'Mistake 3: Ignoring Tax Compliance',
+        body: 'Tax compliance is non-negotiable. Missed obligations can result in penalties, disruption, and avoidable legal exposure.',
+        bullets: [
+          'File and pay all applicable taxes on time, including PAYE, VAT, withholding tax, and company or personal income tax where relevant.',
+          'Stay current with changes in tax law and reporting requirements.',
+          'Seek professional guidance where complexity exists.',
+        ],
+      },
+      {
+        heading: 'Mistake 4: Failing to Reconcile Accounts',
+        body: 'Regular bank reconciliation ensures that transactions are properly captured and records align with bank activity. Missing reconciliations can hide fraud, accounting errors, or cash shortages.',
+      },
+      {
+        heading: 'Mistake 5: Neglecting Management Reporting',
+        body: 'Monthly management reports help track revenue, expenses, profitability, and performance trends. Without them, decision-making becomes reactive and imprecise.',
+      },
+    ],
+    cta: 'Do not let accounting mistakes hold your business back. Kiamina Accounting Services helps SMEs stay compliant, organized, and profitable.',
+  },
+  {
+    slug: 'fund-reporting-mistakes-nonprofits',
+    title: '5 Critical Fund Reporting Mistakes Nonprofits Must Avoid',
+    category: 'Nonprofit Finance',
+    readTime: '6 min read',
+    summary: 'Maintain transparency and donor trust by avoiding common fund reporting errors. This guide outlines five critical mistakes and how nonprofits can correct them.',
+    sections: [
+      {
+        heading: 'Introduction',
+        body: 'Nonprofits rely on diverse funding streams including grants, donations, membership fees, and government allocations. Accurate fund reporting is essential for transparency, compliance, and donor trust.',
+      },
+      {
+        heading: 'Mistake 1: Failing to Separate Funds by Purpose',
+        body: 'Each fund or grant should have its own reporting structure. Mixing funds makes accurate reporting difficult and risks misuse.',
+        bullets: ['Use fund codes to track each funding source and purpose.'],
+      },
+      {
+        heading: 'Mistake 2: Not Tracking Restricted vs. Unrestricted Funds',
+        body: 'Restricted funds must only be used for designated purposes, while unrestricted funds support general operations. Misuse can lead to donor and legal issues.',
+      },
+      {
+        heading: 'Mistake 3: Late or Inaccurate Grant Reporting',
+        body: 'Grants often require periodic reporting. Delays or inaccuracies can affect future funding.',
+        bullets: ['Maintain a reporting calendar.', 'Document all expenditures clearly.'],
+      },
+      {
+        heading: 'Mistake 4: Ignoring Internal Controls',
+        body: 'Weak approval processes increase risk of error and fraud.',
+        bullets: ['Implement dual approvals.', 'Maintain supporting documentation.', 'Reconcile accounts monthly.'],
+      },
+      {
+        heading: 'Mistake 5: Not Reconciling Accounts Regularly',
+        body: 'Regular reconciliation ensures accuracy of fund balances and prevents hidden discrepancies.',
+      },
+    ],
+    cta: 'Proper fund reporting protects your nonprofit and builds donor confidence. Kiamina Accounting Services helps nonprofits stay compliant, organized, and transparent.',
+  },
+  {
+    slug: 'payroll-guide-nigeria',
+    title: 'Payroll Made Simple: A Step-by-Step Guide for Nigerian SMEs and Nonprofits',
+    category: 'Payroll & Compliance',
+    readTime: '8 min read',
+    summary: 'A practical step-by-step guide to setting up and managing compliant payroll in Nigeria, covering employee records, deductions, statutory obligations, and common payroll mistakes.',
+    sections: [
+      {
+        heading: 'Introduction',
+        body: 'Payroll is a critical function for any Nigerian SME or nonprofit. Accurate and timely payroll processing supports employee satisfaction, legal compliance, and financial stability.',
+      },
+      {
+        heading: 'Step 1: Set Up Employee Records',
+        body: 'Comprehensive employee records are the foundation of accurate payroll. Maintain full employee details including salary, bank information, pension details, tax identification, address, attendance, and leave records.',
+      },
+      {
+        heading: 'Step 2: Calculate Gross Pay',
+        body: 'Gross pay includes basic salary, allowances, and overtime pay where applicable. Each element should be consistently documented and calculated according to employment terms and labour rules.',
+      },
+      {
+        heading: 'Step 3: Deduct Employee Contributions and Taxes',
+        body: 'Apply payroll deductions accurately, including PAYE tax, pension contributions, and any other lawful deductions relevant to the employee.',
+        bullets: ['Use current tax tables and statutory rules.', 'Remit all deductions on time to avoid penalties.'],
+      },
+      {
+        heading: 'Step 4: Generate Pay Slips',
+        body: 'Each payslip should clearly show gross pay, deductions, net pay, pay period, and employer details. Payroll records should be retained accurately for statutory and operational purposes.',
+      },
+      {
+        heading: 'Common Payroll Mistakes Organisations Make',
+        bullets: ['Misclassifying employees', 'Incorrect tax calculations', 'Late remittances', 'Poor record-keeping', 'Ignoring changes in legislation'],
+      },
+    ],
+    cta: 'Kiamina Accounting Services offers payroll management and consultation support to help SMEs and nonprofits streamline payroll, ensure compliance, and save time.',
+  },
+]
+
+const SOCIAL_LINKS = [
+  { name: 'LinkedIn', href: 'https://www.linkedin.com/company/kiamina-accounting-services/' },
+  { name: 'Facebook', href: 'https://www.facebook.com/share/1BDKLXtn13/' },
+  { name: 'Instagram', href: 'https://www.instagram.com/kiaminaas?igsh=NGZxajlod3ZidTJp' },
+  { name: 'TikTok', href: 'https://www.tiktok.com/@kiaminaas?_r=1&_t=ZS-92eYTA4KBgF' },
+  { name: 'X', href: 'https://x.com/Kiaminaas?t=7AvK5KaUoEweNxa4173HpA&s=08' },
+  { name: 'Pinterest', href: 'http://pinterest.com/kiaminaas/' },
+]
+
+function generateWebsiteAnalyticsSessionId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `website-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+function normalizeDetectedRegionId(regionId = '') {
+  const normalizedRegionId = String(regionId || '').trim().toLowerCase()
+  return REGION_ID_SET.has(normalizedRegionId) ? normalizedRegionId : ''
+}
+
+function resolveRegionIdFromCountryCode(countryCode = '') {
+  const normalizedCountryCode = String(countryCode || '').trim().toUpperCase()
+  return normalizeDetectedRegionId(REGION_ID_BY_COUNTRY_CODE[normalizedCountryCode])
+}
+
+function resolveRegionIdFromCountryName(countryName = '') {
+  const normalizedCountryName = String(countryName || '').trim().toLowerCase()
+  return normalizeDetectedRegionId(REGION_ID_BY_COUNTRY_NAME[normalizedCountryName])
+}
+
+function extractCountryCodeFromLocale(locale = '') {
+  const rawLocale = String(locale || '').trim()
+  if (!rawLocale) return ''
+
+  try {
+    if (typeof Intl !== 'undefined' && typeof Intl.Locale === 'function') {
+      return String(new Intl.Locale(rawLocale).region || '').trim().toUpperCase()
+    }
+  } catch {
+    // Fall back to manual parsing for older browsers or unusual locale strings.
+  }
+
+  const match = rawLocale.match(/[-_]([a-z]{2})(?:[-_]|$)/i)
+  return String(match?.[1] || '').trim().toUpperCase()
+}
+
+function inferRegionFromLocaleSignals() {
+  if (typeof navigator === 'undefined') return ''
+  const locales = [
+    ...(Array.isArray(navigator.languages) ? navigator.languages : []),
+    navigator.language,
+  ]
+
+  for (const locale of locales) {
+    const regionId = resolveRegionIdFromCountryCode(extractCountryCodeFromLocale(locale))
+    if (regionId) return regionId
+  }
+
+  return ''
+}
+
+function inferRegionFromTimeZone() {
+  if (typeof Intl === 'undefined') return ''
+  const timeZone = String(Intl.DateTimeFormat().resolvedOptions().timeZone || '').trim()
+  if (!timeZone) return ''
+  if (REGION_ID_BY_TIME_ZONE[timeZone]) return REGION_ID_BY_TIME_ZONE[timeZone]
+  if (CANADA_TIME_ZONES.has(timeZone)) return 'canada'
+  if (UNITED_STATES_TIME_ZONES.has(timeZone)) return 'united-states'
+  if (timeZone.startsWith('Australia/')) return 'australia'
+  return ''
+}
+
+function inferRegionFromClientSignals() {
+  return inferRegionFromTimeZone() || inferRegionFromLocaleSignals() || 'nigeria'
+}
+
+async function detectRegionFromIpAddress({ signal } = {}) {
+  if (typeof fetch !== 'function') return ''
+
+  try {
+    const response = await fetch('https://ipapi.co/json/', {
+      cache: 'no-store',
+      referrerPolicy: 'no-referrer',
+      signal,
+    })
+    if (!response.ok) return ''
+    const payload = await response.json().catch(() => ({}))
+    return (
+      resolveRegionIdFromCountryCode(payload?.country_code) ||
+      resolveRegionIdFromCountryName(payload?.country_name) ||
+      ''
     )
-
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [])
-
-  return (
-    <div
-      ref={elementRef}
-      className={`transition-all duration-700 ease-out ${isVisible ? REVEAL_VISIBLE_CLASS : REVEAL_HIDDEN_CLASS} ${className}`}
-      style={{ transitionDelay: `${delayMs}ms` }}
-    >
-      {children}
-    </div>
-  )
+  } catch {
+    return ''
+  }
 }
 
-function SectionShell({ children, tint = false }) {
-  return (
-    <section className={`py-20 ${tint ? 'bg-[#eef3ff]' : 'bg-white'}`}>
-      <div className="mx-auto w-[min(1160px,92vw)]">
-        {children}
-      </div>
-    </section>
-  )
+function getSupportedRegionId(regionId = '') {
+  return normalizeDetectedRegionId(regionId) || 'nigeria'
 }
 
-function SurfaceCard({ children, className = '' }) {
-  return (
-    <article className={`rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_12px_26px_rgba(15,23,42,0.05)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_18px_34px_rgba(15,23,42,0.09)] ${className}`}>
-      {children}
-    </article>
-  )
+function getLocationDetectionLabel({ isResolved = false, regionLabel = '' } = {}) {
+  return isResolved ? regionLabel : 'Detecting region...'
+}
+
+function getLocationDetectionAriaLabel({ isResolved = false, regionLabel = '' } = {}) {
+  return isResolved ? `Detected region: ${regionLabel}` : 'Detecting your region'
+}
+
+function getRegionFlagAlt({ isResolved = false, regionLabel = '' } = {}) {
+  return isResolved ? `${regionLabel} flag` : 'Detected region flag'
+}
+
+function getManualRegionSelectionMetadata(region = {}) {
+  return {
+    detectionSource: 'manual',
+    regionId: region.id || '',
+    regionLabel: region.label || '',
+  }
 }
 
 function PreliminaryPageLoadingShell() {
@@ -425,7 +618,7 @@ function BrandImage({ src, alt, className = '', fallbackSrc = '' }) {
 
   if (hasError) {
     return (
-      <div className={`grid place-items-center rounded-xl border border-dashed border-[#153585]/35 bg-[linear-gradient(140deg,#e8efff,#f5f8ff)] text-center text-sm font-semibold text-[#153585] ${className}`}>
+      <div className={`grid place-items-center rounded-xl border border-dashed border-[#153585]/35 bg-[#f5f8ff] text-center text-sm font-semibold text-[#153585] ${className}`}>
         Image Placeholder
       </div>
     )
@@ -450,218 +643,90 @@ function BrandImage({ src, alt, className = '', fallbackSrc = '' }) {
   )
 }
 
-function CountUpMetric({ value = '', className = '' }) {
-  const metricText = String(value || '').trim()
-  const parsedMetric = useMemo(() => {
-    const match = metricText.match(/^(\d+)(.*)$/)
-    if (!match) return null
-    return {
-      target: Number(match[1]),
-      suffix: match[2] || '',
-    }
-  }, [metricText])
-
-  const [displayNumber, setDisplayNumber] = useState(0)
-  const [hasStarted, setHasStarted] = useState(false)
-  const metricRef = useRef(null)
-
-  useEffect(() => {
-    setDisplayNumber(0)
-    setHasStarted(false)
-  }, [metricText])
-
-  useEffect(() => {
-    if (!parsedMetric) return undefined
-    const node = metricRef.current
-    if (!node) return undefined
-
-    if (!('IntersectionObserver' in window)) {
-      setHasStarted(true)
-      return undefined
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setHasStarted(true)
-            observer.unobserve(entry.target)
-          }
-        })
-      },
-      { threshold: 0.35 },
-    )
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [parsedMetric])
-
-  useEffect(() => {
-    if (!parsedMetric || !hasStarted) return undefined
-    let rafId = 0
-    const durationMs = 1200
-    const startAt = performance.now()
-
-    const tick = (now) => {
-      const progress = Math.min((now - startAt) / durationMs, 1)
-      const currentValue = Math.round(parsedMetric.target * progress)
-      setDisplayNumber(currentValue)
-      if (progress < 1) {
-        rafId = window.requestAnimationFrame(tick)
-      }
-    }
-
-    rafId = window.requestAnimationFrame(tick)
-    return () => window.cancelAnimationFrame(rafId)
-  }, [hasStarted, parsedMetric])
-
-  if (!parsedMetric) {
-    return <span className={className}>{metricText}</span>
-  }
-
+function SectionHeading({ eyebrow, title, body = '', invert = false }) {
   return (
-    <span ref={metricRef} className={className}>
-      {displayNumber}
-      {parsedMetric.suffix}
-    </span>
-  )
-}
-
-function HeroPanel({ pageKey, scrollY = 0, children }) {
-  const heroImage = HERO_BACKGROUNDS[pageKey] || HERO_BACKGROUNDS.home
-  const parallaxOffset = Math.max(-90, Math.min(90, Math.round(scrollY * -0.08)))
-  return (
-    <section
-      className="relative overflow-hidden bg-cover bg-center py-20 lg:py-24"
-      style={{
-        backgroundImage: `linear-gradient(125deg, rgba(8, 28, 79, 0.78), rgba(21, 53, 133, 0.62)), url('${heroImage}')`,
-        backgroundPosition: `center ${parallaxOffset}px`,
-      }}
-    >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.2),transparent_45%)]" />
-      <div className="relative z-10 mx-auto w-[min(1160px,92vw)]">
-        {children}
+    <div className="max-w-3xl">
+      <div className="text-sm font-semibold uppercase tracking-[0.24em] text-[#6491DE]">
+        {eyebrow}
       </div>
-    </section>
+      <h2 className={`mt-4 text-3xl font-semibold tracking-tight sm:text-4xl ${invert ? 'text-white' : 'text-slate-950'}`}>
+        {title}
+      </h2>
+      {body ? (
+        <p className={`mt-5 text-lg leading-8 ${invert ? 'text-blue-100' : 'text-slate-600'}`}>{body}</p>
+      ) : null}
+    </div>
   )
 }
 
-const inferRegionFromClientSignals = () => {
-  if (typeof window === 'undefined') return 'nigeria'
-
-  const timeZone = String(Intl.DateTimeFormat().resolvedOptions().timeZone || '').toLowerCase()
-  if (timeZone.includes('lagos')) return 'nigeria'
-  if (timeZone.includes('toronto') || timeZone.includes('vancouver') || timeZone.includes('canada')) return 'canada'
-  if (timeZone.includes('new_york') || timeZone.includes('chicago') || timeZone.includes('los_angeles') || timeZone.includes('denver')) return 'united-states'
-  if (timeZone.includes('london')) return 'united-kingdom'
-  if (timeZone.includes('sydney') || timeZone.includes('melbourne') || timeZone.includes('brisbane') || timeZone.includes('australia')) return 'australia'
-
-  const locale = String(navigator.language || '').toLowerCase()
-  if (locale.endsWith('-ng')) return 'nigeria'
-  if (locale.endsWith('-ca')) return 'canada'
-  if (locale.endsWith('-us')) return 'united-states'
-  if (locale.endsWith('-gb') || locale.endsWith('-uk')) return 'united-kingdom'
-  if (locale.endsWith('-au')) return 'australia'
-  return 'nigeria'
+function IconBadge({ icon: Icon, dark = false }) {
+  return (
+    <div className={`mb-5 inline-flex h-12 w-12 items-center justify-center rounded-2xl ${dark ? 'bg-white/10 text-[#6491DE] ring-1 ring-white/10' : 'border border-[#D9E3F4] bg-[#F1F1F1] text-[#073D7F]'}`}>
+      <Icon className="h-5 w-5" />
+    </div>
+  )
 }
 
-const toInsightBodyParagraphs = (value = '') => (
-  String(value || '')
-    .split(/\n{2,}/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean)
-)
-
-const toInsightCategoryLabel = (value = '') => (
-  String(value || '')
-    .trim()
-    .replace(/[-_]+/g, ' ')
-    .split(' ')
-    .filter(Boolean)
-    .map((token) => token.charAt(0).toUpperCase() + token.slice(1).toLowerCase())
-    .join(' ')
-)
-
-const normalizeInsightArticle = (source = {}, index = 0) => {
-  const rawTitle = String(source.title || '').trim()
-  if (!rawTitle) return null
-
-  const body = Array.isArray(source.body)
-    ? source.body.map((item) => String(item || '').trim()).filter(Boolean)
-    : toInsightBodyParagraphs(source.content)
-  const fallbackParagraph = String(source.summary || source.excerpt || '').trim()
-  const normalizedBody = body.length > 0
-    ? body
-    : [fallbackParagraph || 'Insight content will be published shortly.']
-  const summary = String(source.excerpt || source.summary || normalizedBody[0] || '').trim()
-  const readTimeMinutes = Number(source.readTimeMinutes)
-  const readTime = Number.isFinite(readTimeMinutes) && readTimeMinutes > 0
-    ? `${Math.round(readTimeMinutes)} min read`
-    : String(source.readTime || '').trim() || '6 min read'
-  const category = toInsightCategoryLabel(source.category) || 'Financial Strategy'
-  const slugSource = String(source.slug || source.articleId || rawTitle || `insight-${index + 1}`).trim()
-  const slug = slugSource.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-
-  return {
-    slug: slug || `insight-${index + 1}`,
-    title: rawTitle,
-    excerpt: summary,
-    body: normalizedBody,
-    author: String(source.author || source.createdByUid || 'Kiamina Advisory Team').trim(),
-    category,
-    readTime,
-    publishedAt: source.publishedAt || source.updatedAt || source.createdAt || new Date().toISOString(),
-    cover: String(source.cover || source.coverImageUrl || source.image || '').trim()
-      || 'https://unsplash.com/photos/HG9M8M29Ig4/download?force=true&w=1200',
+function SocialIcon({ name, className = 'h-4 w-4' }) {
+  if (name === 'LinkedIn') {
+    return (
+      <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+        <path d="M6.94 8.5H3.56V20h3.38V8.5ZM5.25 3A2.03 2.03 0 0 0 3.2 5.03c0 1.12.91 2.03 2.02 2.03h.03a2.03 2.03 0 1 0 0-4.06ZM20.44 12.88c0-3.46-1.85-5.07-4.31-5.07-1.99 0-2.88 1.09-3.38 1.86V8.5H9.38c.04.78 0 11.5 0 11.5h3.37v-6.42c0-.34.03-.68.13-.92.27-.67.89-1.37 1.93-1.37 1.36 0 1.9 1.03 1.9 2.55V20h3.37v-7.12Z" />
+      </svg>
+    )
   }
+  if (name === 'Facebook') {
+    return (
+      <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+        <path d="M13.5 21v-7h2.3l.4-2.8h-2.7V9.45c0-.81.22-1.37 1.39-1.37H16.3V5.56c-.24-.03-1.08-.1-2.06-.1-2.04 0-3.44 1.24-3.44 3.52v2.22H8.5V14h2.3v7h2.7Z" />
+      </svg>
+    )
+  }
+  if (name === 'Instagram') {
+    return (
+      <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+        <path d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5Zm0 2.2A2.8 2.8 0 0 0 4.2 7v10A2.8 2.8 0 0 0 7 19.8h10a2.8 2.8 0 0 0 2.8-2.8V7A2.8 2.8 0 0 0 17 4.2H7Zm5 3.3A4.5 4.5 0 1 1 7.5 12 4.5 4.5 0 0 1 12 7.5Zm0 2.2A2.3 2.3 0 1 0 14.3 12 2.3 2.3 0 0 0 12 9.7Zm4.7-3.15a1.05 1.05 0 1 1-1.05 1.05 1.05 1.05 0 0 1 1.05-1.05Z" />
+      </svg>
+    )
+  }
+  if (name === 'TikTok') {
+    return (
+      <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+        <path d="M14.5 3c.53 1.52 1.46 2.67 2.8 3.46.8.47 1.66.75 2.7.82v2.68a7.7 7.7 0 0 1-2.67-.52 8.03 8.03 0 0 1-1.87-1.04v6.1c0 1.25-.4 2.35-1.18 3.29A5.64 5.64 0 0 1 9.8 20a5.58 5.58 0 0 1-3.54-1.31A5.39 5.39 0 0 1 4 14.33a5.34 5.34 0 0 1 1.82-4.05A5.63 5.63 0 0 1 9.7 8.9v2.66a2.85 2.85 0 0 0-1.92.6 2.67 2.67 0 0 0-.98 2.13c0 .84.29 1.53.88 2.08.58.54 1.28.8 2.1.8.9 0 1.63-.3 2.18-.92.56-.61.84-1.42.84-2.4V3h2.68Z" />
+      </svg>
+    )
+  }
+  if (name === 'X') {
+    return (
+      <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+        <path d="M18.9 2H22l-6.76 7.73L23.2 22H17l-4.85-5.96L6.94 22H3.82l7.23-8.26L1.4 2h6.35l4.38 5.44L18.9 2Zm-1.08 18.14h1.72L6.82 3.76H4.97l12.85 16.38Z" />
+      </svg>
+    )
+  }
+  if (name === 'Pinterest') {
+    return (
+      <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+        <path d="M12.04 2C6.6 2 3 5.64 3 10.49c0 3.1 1.74 4.86 2.79 4.86.43 0 .68-1.2.68-1.53 0-.4-1.02-1.26-1.02-2.96 0-3.51 2.67-6 6.45-6 3.13 0 5.45 1.78 5.45 5.05 0 2.44-.98 7.02-4.15 7.02-1.15 0-2.14-.85-2.14-2.02 0-1.75 1.22-3.45 1.22-5.26 0-3.14-4.45-2.57-4.45 1.22 0 .8.1 1.68.46 2.4-.67 2.88-2.05 7.16-2.05 10.08 0 .92.13 1.83.2 2.75.14.15.07.13.28.06 2.05-2.82 1.98-3.37 2.91-7.08.5.95 1.8 1.45 2.82 1.45 4.33 0 6.28-4.21 6.28-8.05C20.5 5.3 16.8 2 12.04 2Z" />
+      </svg>
+    )
+  }
+  return null
 }
 
-const generateWebsiteAnalyticsSessionId = () => (
-  `web_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
-)
-
-const CONTACT_INITIAL_STATE = {
-  name: '',
-  email: '',
-  country: '',
-  service: '',
-  message: '',
+function SocialBadge({ href, name }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      title={name}
+      aria-label={name}
+      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#D9E3F4] bg-white text-[#073D7F] transition hover:-translate-y-0.5 hover:border-[#6491DE] hover:bg-[#F1F1F1] hover:text-[#6491DE]"
+    >
+      <SocialIcon name={name} />
+    </a>
+  )
 }
-
-const CONTACT_MAP_EMBED_SRC = 'https://www.google.com/maps?q=10+Akpunonu+Street,+Port+Harcourt,+Rivers+State,+Nigeria,+500102&output=embed'
-const CALENDAR_BOOKING_URL = 'https://calendar.app.google/VwUuE8XD1MHBRwy87'
-const INSIGHTS_PER_PAGE_OPTIONS = [10, 20, 50, 100]
-const WEBSITE_ANALYTICS_SESSION_STORAGE_KEY = 'kiaminaWebsiteAnalyticsSessionId'
-
-const ABOUT_PROCESS_STEPS = [
-  {
-    id: 'discovery',
-    step: '01',
-    title: 'Discovery & Assessment',
-    detail: 'We assess accounting quality, control gaps, and compliance exposure across reporting and tax operations.',
-    Icon: Search,
-  },
-  {
-    id: 'setup',
-    step: '02',
-    title: 'System Setup or Cleanup',
-    detail: 'We design and implement clean structures, policy controls, and close-cycle discipline for reliable books.',
-    Icon: FileBarChart2,
-  },
-  {
-    id: 'support',
-    step: '03',
-    title: 'Ongoing Accounting, Tax & Advisory Support',
-    detail: 'We run continuous execution with executive reporting cadence and proactive strategic finance guidance.',
-    Icon: TrendingUp,
-  },
-]
-
-const ABOUT_TRACK_RECORD = [
-  { metric: '200+', label: 'Organizations Served', Icon: Building2 },
-  { metric: '5', label: 'Global Regions', Icon: Globe2 },
-  { metric: '15+', label: 'Years Combined Experience', Icon: Clock3 },
-  { metric: '99%', label: 'Client Retention Rate', Icon: Award },
-]
 
 function PreliminaryCorporateSite({
   activePage = 'home',
@@ -679,39 +744,45 @@ function PreliminaryCorporateSite({
   const [isRegionResolved, setIsRegionResolved] = useState(false)
   const [isHeaderCompact, setIsHeaderCompact] = useState(false)
   const [scrollY, setScrollY] = useState(0)
-  const [contactForm, setContactForm] = useState(CONTACT_INITIAL_STATE)
-  const [contactErrors, setContactErrors] = useState({})
-  const [contactSubmitted, setContactSubmitted] = useState(false)
-  const [insightArticles, setInsightArticles] = useState(INSIGHTS)
-  const [insightsLoading, setInsightsLoading] = useState(false)
-  const [activeInsightSlug, setActiveInsightSlug] = useState('')
-  const [insightSearch, setInsightSearch] = useState('')
-  const [insightCategory, setInsightCategory] = useState('All Categories')
-  const [insightSort, setInsightSort] = useState('newest')
-  const [insightPage, setInsightPage] = useState(1)
-  const [insightsPerPage, setInsightsPerPage] = useState(10)
   const [isPreliminaryPageLoading, setIsPreliminaryPageLoading] = useState(true)
-  const [newsletterLeadForm, setNewsletterLeadForm] = useState({
-    fullName: '',
+  const [activeInsightSlug, setActiveInsightSlug] = useState(INSIGHTS[0].slug)
+  const [newsletterForm, setNewsletterForm] = useState({ fullName: '', email: '' })
+  const [newsletterStatus, setNewsletterStatus] = useState('idle')
+  const [newsletterMessage, setNewsletterMessage] = useState('')
+  const [contactForm, setContactForm] = useState({
+    name: '',
     email: '',
-    serviceFocus: 'Business Insights & Financial Strategy',
+    company: '',
+    service: '',
+    message: '',
   })
-  const [newsletterErrors, setNewsletterErrors] = useState({})
-  const [newsletterSubmitted, setNewsletterSubmitted] = useState(false)
+  const [contactStatus, setContactStatus] = useState('idle')
+  const [contactMessage, setContactMessage] = useState('')
 
   const regionsRef = useRef(null)
   const analyticsSessionIdRef = useRef('')
   const pageLoadingFrameRef = useRef(0)
+  const manualRegionSelectionRef = useRef(false)
+  const pendingConsultationScrollRef = useRef(false)
+
+  const resolvedPage = useMemo(
+    () => (NAV_ITEMS.some((item) => item.id === activePage) ? activePage : 'home'),
+    [activePage],
+  )
+
+  const selectedRegion = useMemo(
+    () => REGION_ITEMS.find((item) => item.id === selectedRegionId) || REGION_ITEMS[0],
+    [selectedRegionId],
+  )
+
+  const activeInsight = useMemo(
+    () => INSIGHTS.find((item) => item.slug === activeInsightSlug) || INSIGHTS[0],
+    [activeInsightSlug],
+  )
 
   useEffect(() => {
     setMobileOpen(false)
     setRegionsOpen(false)
-  }, [activePage])
-
-  useEffect(() => {
-    if (activePage !== 'insights') {
-      setActiveInsightSlug('')
-    }
   }, [activePage])
 
   useEffect(() => {
@@ -765,129 +836,84 @@ function PreliminaryCorporateSite({
 
   useEffect(() => {
     let isCancelled = false
+    const abortController = typeof AbortController === 'function' ? new AbortController() : null
+    const timeoutId = typeof window !== 'undefined' && abortController
+      ? window.setTimeout(() => abortController.abort(), REGION_DETECTION_TIMEOUT_MS)
+      : 0
 
-    const applyRegion = (regionId) => {
-      if (isCancelled) return
-      const normalizedRegionId = REGION_ID_SET.has(regionId) ? regionId : 'nigeria'
-      const matchedRegion = REGION_ITEMS.find((item) => item.id === normalizedRegionId) || REGION_ITEMS[0]
-      setSelectedRegionId(matchedRegion.id)
-      setContactForm((prev) => (
-        prev.country
-          ? prev
-          : { ...prev, country: matchedRegion.label }
-      ))
+    const applyDetectedRegion = (regionId) => {
+      if (isCancelled || manualRegionSelectionRef.current) return
+      setSelectedRegionId(getSupportedRegionId(regionId))
       setIsRegionResolved(true)
     }
 
-    // Avoid direct browser-side geolocation calls that are frequently blocked by
-    // third-party CORS and rate limits in local development.
-    applyRegion(inferRegionFromClientSignals())
+    applyDetectedRegion(inferRegionFromClientSignals())
+    setIsRegionResolved(true)
+
+    void detectRegionFromIpAddress({ signal: abortController?.signal })
+      .then((regionId) => {
+        if (regionId) applyDetectedRegion(regionId)
+      })
+      .finally(() => {
+        if (typeof window !== 'undefined' && timeoutId) {
+          window.clearTimeout(timeoutId)
+        }
+        if (!isCancelled && !manualRegionSelectionRef.current) {
+          setIsRegionResolved(true)
+        }
+      })
+
     return () => {
       isCancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    let isCancelled = false
-
-    const loadInsightsFromBackend = async () => {
-      setInsightsLoading(true)
-      try {
-        const response = await apiFetch('/notifications/insights/articles?status=published&visibility=public&limit=100')
-        if (!response.ok) return
-        const payload = await response.json().catch(() => [])
-        const sourceItems = Array.isArray(payload)
-          ? payload
-          : (Array.isArray(payload?.items) ? payload.items : [])
-        const normalizedItems = sourceItems
-          .map((item, index) => normalizeInsightArticle(item, index))
-          .filter(Boolean)
-        if (!isCancelled && normalizedItems.length > 0) {
-          setInsightArticles(normalizedItems)
-        }
-      } catch {
-        // Keep fallback in-memory insights when API is unavailable.
-      } finally {
-        if (!isCancelled) setInsightsLoading(false)
+      if (typeof window !== 'undefined' && timeoutId) {
+        window.clearTimeout(timeoutId)
+      }
+      if (abortController) {
+        abortController.abort()
       }
     }
+  }, [])
 
-    void loadInsightsFromBackend()
-    return () => {
-      isCancelled = true
+  useEffect(() => {
+    setIsPreliminaryPageLoading(true)
+    if (typeof window === 'undefined') {
+      setIsPreliminaryPageLoading(false)
+      return undefined
+    }
+
+    if (pageLoadingFrameRef.current) {
+      window.cancelAnimationFrame(pageLoadingFrameRef.current)
+    }
+
+    pageLoadingFrameRef.current = window.requestAnimationFrame(() => {
+      pageLoadingFrameRef.current = 0
+      setIsPreliminaryPageLoading(false)
+    })
+
+    return undefined
+  }, [resolvedPage])
+
+  useEffect(() => () => {
+    if (typeof window !== 'undefined' && pageLoadingFrameRef.current) {
+      window.cancelAnimationFrame(pageLoadingFrameRef.current)
     }
   }, [])
 
-  const resolvedPage = useMemo(
-    () => (NAV_ITEMS.some((item) => item.id === activePage) ? activePage : 'home'),
-    [activePage],
-  )
-  const selectedRegion = useMemo(
-    () => REGION_ITEMS.find((item) => item.id === selectedRegionId) || REGION_ITEMS[0],
-    [selectedRegionId],
-  )
-  const insightCategories = useMemo(() => {
-    const dynamicCategories = [
-      ...new Set(
-        insightArticles
-          .map((item) => String(item.category || '').trim())
-          .filter(Boolean),
-      ),
-    ]
-    return ['All Categories', ...dynamicCategories]
-  }, [insightArticles])
   useEffect(() => {
-    if (insightCategory === 'All Categories') return
-    if (!insightCategories.includes(insightCategory)) {
-      setInsightCategory('All Categories')
+    if (!pendingConsultationScrollRef.current || resolvedPage !== 'contact' || isPreliminaryPageLoading) {
+      return undefined
     }
-  }, [insightCategory, insightCategories])
-  const activeInsight = useMemo(
-    () => insightArticles.find((item) => item.slug === activeInsightSlug) || null,
-    [activeInsightSlug, insightArticles],
-  )
-  const filteredInsights = useMemo(() => {
-    let result = [...insightArticles]
+    if (typeof window === 'undefined') return undefined
 
-    if (insightSearch.trim()) {
-      const searchLower = insightSearch.toLowerCase()
-      result = result.filter(
-        (item) =>
-          item.title.toLowerCase().includes(searchLower) ||
-          item.excerpt.toLowerCase().includes(searchLower) ||
-          item.category.toLowerCase().includes(searchLower) ||
-          item.body.some((paragraph) => paragraph.toLowerCase().includes(searchLower)),
-      )
-    }
+    const timeoutId = window.setTimeout(() => {
+      pendingConsultationScrollRef.current = false
+      document
+        .getElementById(CONTACT_CONSULTATION_CALENDAR_ID)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
 
-    if (insightCategory && insightCategory !== 'All Categories') {
-      result = result.filter((item) => item.category === insightCategory)
-    }
-
-    result.sort((a, b) => {
-      const dateA = new Date(a.publishedAt)
-      const dateB = new Date(b.publishedAt)
-      return insightSort === 'newest' ? dateB - dateA : dateA - dateB
-    })
-
-    return result
-  }, [insightArticles, insightSearch, insightCategory, insightSort])
-  const totalInsightPages = useMemo(
-    () => Math.max(1, Math.ceil(filteredInsights.length / insightsPerPage)),
-    [filteredInsights.length, insightsPerPage],
-  )
-  const paginatedInsights = useMemo(() => {
-    const startIndex = (insightPage - 1) * insightsPerPage
-    return filteredInsights.slice(startIndex, startIndex + insightsPerPage)
-  }, [filteredInsights, insightPage, insightsPerPage])
-  useEffect(() => {
-    setInsightPage(1)
-  }, [insightSearch, insightCategory, insightSort, insightsPerPage])
-  useEffect(() => {
-    if (insightPage > totalInsightPages) {
-      setInsightPage(totalInsightPages)
-    }
-  }, [insightPage, totalInsightPages])
+    return () => window.clearTimeout(timeoutId)
+  }, [isPreliminaryPageLoading, resolvedPage])
 
   const ensureAnalyticsSessionId = () => {
     if (analyticsSessionIdRef.current) return analyticsSessionIdRef.current
@@ -912,21 +938,18 @@ function PreliminaryCorporateSite({
     if (!eventType) return
     const sessionId = ensureAnalyticsSessionId()
     if (!sessionId) return
-    const payload = {
-      sessionId,
-      eventType,
-      page,
-      targetType,
-      targetId,
-      targetLabel,
-      metadata: metadata && typeof metadata === 'object' ? metadata : {},
-    }
     void apiFetch('/notifications/insights/analytics/events', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId,
+        eventType,
+        page,
+        targetType,
+        targetId,
+        targetLabel,
+        metadata: metadata && typeof metadata === 'object' ? metadata : {},
+      }),
     })
   }
 
@@ -939,49 +962,6 @@ function PreliminaryCorporateSite({
       targetLabel: resolvedPage,
     })
   }, [resolvedPage])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const sessionId = ensureAnalyticsSessionId()
-    if (!sessionId) return
-    const visitMarkerKey = `kiaminaWebsiteVisitTracked:${sessionId}`
-    const alreadyTracked = window.sessionStorage.getItem(visitMarkerKey)
-    if (alreadyTracked) return
-    window.sessionStorage.setItem(visitMarkerKey, '1')
-    trackWebsiteEvent({
-      eventType: 'site_visit',
-      page: resolvedPage,
-      targetType: 'session',
-      targetId: sessionId,
-      targetLabel: 'Website Visit',
-      metadata: {
-        referrer: String(document.referrer || '').slice(0, 300),
-      },
-    })
-  }, [])
-
-  useEffect(() => {
-    setIsPreliminaryPageLoading(true)
-    if (typeof window === 'undefined') {
-      setIsPreliminaryPageLoading(false)
-      return
-    }
-
-    if (pageLoadingFrameRef.current) {
-      window.cancelAnimationFrame(pageLoadingFrameRef.current)
-    }
-
-    pageLoadingFrameRef.current = window.requestAnimationFrame(() => {
-      pageLoadingFrameRef.current = 0
-      setIsPreliminaryPageLoading(false)
-    })
-  }, [resolvedPage])
-
-  useEffect(() => () => {
-    if (typeof window !== 'undefined' && pageLoadingFrameRef.current) {
-      window.cancelAnimationFrame(pageLoadingFrameRef.current)
-    }
-  }, [])
 
   const handleNavigate = (nextPage) => {
     const normalizedNextPage = NAV_ITEMS.some((item) => item.id === nextPage) ? nextPage : 'home'
@@ -1005,142 +985,6 @@ function PreliminaryCorporateSite({
     }
   }
 
-  const clearContactError = (fieldName) => {
-    setContactErrors((prev) => {
-      if (!prev[fieldName]) return prev
-      const next = { ...prev }
-      delete next[fieldName]
-      return next
-    })
-  }
-
-  const validateContactForm = (source = contactForm) => {
-    const errors = {}
-    if (String(source.name || '').trim().length < 2) {
-      errors.name = 'Please enter your full name.'
-    }
-    if (!EMAIL_REGEX.test(String(source.email || '').trim())) {
-      errors.email = 'Enter a valid email address.'
-    }
-    if (!String(source.country || '').trim()) {
-      errors.country = 'Please select your country.'
-    }
-    if (String(source.service || '').trim().length < 3) {
-      errors.service = 'Tell us the service you need.'
-    }
-    if (String(source.message || '').trim().length < 20) {
-      errors.message = 'Message should be at least 20 characters.'
-    }
-    return errors
-  }
-
-  const submitContact = (event) => {
-    event.preventDefault()
-    const nextErrors = validateContactForm(contactForm)
-    setContactErrors(nextErrors)
-    if (Object.keys(nextErrors).length > 0) {
-      setContactSubmitted(false)
-      return
-    }
-    setContactSubmitted(true)
-    trackWebsiteEvent({
-      eventType: 'contact_submit',
-      page: 'contact',
-      targetType: 'form',
-      targetId: 'contact-form',
-      targetLabel: 'Contact Form Submission',
-      metadata: {
-        country: contactForm.country,
-        service: contactForm.service,
-      },
-    })
-    setContactForm({
-      ...CONTACT_INITIAL_STATE,
-      country: selectedRegion.label,
-    })
-  }
-  const openInsightArticle = (slug) => {
-    const selectedInsight = filteredInsights.find((item) => item.slug === slug)
-    trackWebsiteEvent({
-      eventType: 'article_open',
-      page: 'insights',
-      targetType: 'article',
-      targetId: slug,
-      targetLabel: selectedInsight?.title || slug,
-      metadata: {
-        category: selectedInsight?.category || '',
-      },
-    })
-    setActiveInsightSlug(slug)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const closeInsightArticle = () => {
-    setActiveInsightSlug('')
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const clearNewsletterError = (fieldName) => {
-    setNewsletterErrors((prev) => {
-      if (!prev[fieldName]) return prev
-      const next = { ...prev }
-      delete next[fieldName]
-      return next
-    })
-  }
-
-  const validateNewsletterForm = (source = newsletterLeadForm) => {
-    const errors = {}
-    if (String(source.fullName || '').trim().length < 2) {
-      errors.fullName = 'Please enter your full name.'
-    }
-    if (!EMAIL_REGEX.test(String(source.email || '').trim())) {
-      errors.email = 'Enter a valid email address.'
-    }
-    if (!String(source.serviceFocus || '').trim()) {
-      errors.serviceFocus = 'Please choose one update topic.'
-    }
-    return errors
-  }
-
-  const submitNewsletterLead = async (event) => {
-    event.preventDefault()
-    const nextErrors = validateNewsletterForm(newsletterLeadForm)
-    setNewsletterErrors(nextErrors)
-    if (Object.keys(nextErrors).length > 0) {
-      setNewsletterSubmitted(false)
-      return
-    }
-    const registration = await registerNewsletterSubscriberLead({
-      contactEmail: newsletterLeadForm.email,
-      fullName: newsletterLeadForm.fullName,
-      serviceFocus: newsletterLeadForm.serviceFocus,
-      capturePage: resolvedPage,
-      capturePath: window.location.pathname,
-    })
-    if (!registration.ok) {
-      setNewsletterSubmitted(false)
-      setNewsletterErrors({ email: registration.message || 'Unable to subscribe right now.' })
-      return
-    }
-    setNewsletterSubmitted(true)
-    trackWebsiteEvent({
-      eventType: 'newsletter_subscribe',
-      page: resolvedPage,
-      targetType: 'form',
-      targetId: 'newsletter-form',
-      targetLabel: 'Newsletter Subscription',
-      metadata: {
-        serviceFocus: newsletterLeadForm.serviceFocus,
-      },
-    })
-    setNewsletterLeadForm({
-      fullName: '',
-      email: '',
-      serviceFocus: 'Business Insights & Financial Strategy',
-    })
-  }
-
   const handleEngageService = ({
     eventType = 'cta_click',
     sourcePage = resolvedPage,
@@ -1162,1300 +1006,1016 @@ function PreliminaryCorporateSite({
     handleNavigate('contact')
   }
 
-  const primaryButtonClass = 'inline-flex items-center justify-center rounded-full bg-[#153585] px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_26px_rgba(21,53,133,0.24)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#1f4aa8] hover:shadow-[0_18px_36px_rgba(21,53,133,0.3)]'
-  const secondaryButtonClass = 'inline-flex items-center justify-center rounded-full border border-[#153585]/25 bg-white px-6 py-3 text-sm font-semibold text-[#153585] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#153585]/45 hover:shadow-[0_10px_18px_rgba(21,53,133,0.12)]'
-  const formatPublishedDate = (value) => {
-    if (!value) return ''
-    const parsed = new Date(value)
-    if (Number.isNaN(parsed.getTime())) return ''
-    return new Intl.DateTimeFormat('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    }).format(parsed)
+  const handleBookConsultation = () => {
+    pendingConsultationScrollRef.current = true
+    setMobileOpen(false)
+    trackWebsiteEvent({
+      eventType: 'cta_click',
+      page: resolvedPage,
+      targetType: 'calendar',
+      targetId: CONTACT_CONSULTATION_CALENDAR_ID,
+      targetLabel: 'Book Consultation',
+    })
+
+    if (resolvedPage !== 'contact') {
+      handleNavigate('contact')
+      return
+    }
+
+    if (typeof window === 'undefined') return
+    window.requestAnimationFrame(() => {
+      pendingConsultationScrollRef.current = false
+      document
+        .getElementById(CONTACT_CONSULTATION_CALENDAR_ID)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   }
 
+  const submitNewsletter = async (event) => {
+    event.preventDefault()
+    const normalizedEmail = String(newsletterForm.email || '').trim()
+    if (!EMAIL_REGEX.test(normalizedEmail)) {
+      setNewsletterStatus('error')
+      setNewsletterMessage('Please enter a valid email address.')
+      return
+    }
+
+    setNewsletterStatus('loading')
+    setNewsletterMessage('Connecting your subscription...')
+    const registration = await registerNewsletterSubscriberLead({
+      contactEmail: normalizedEmail,
+      fullName: newsletterForm.fullName,
+      serviceFocus: 'Accounting, compliance, payroll, and reporting insights',
+      capturePage: resolvedPage,
+      capturePath: typeof window !== 'undefined' ? window.location.pathname : '',
+    })
+
+    if (!registration.ok) {
+      setNewsletterStatus('error')
+      setNewsletterMessage(registration.message || 'Unable to subscribe right now.')
+      return
+    }
+
+    setNewsletterStatus('success')
+    setNewsletterMessage('Thank you. You are subscribed for Kiamina insights.')
+    setNewsletterForm({ fullName: '', email: '' })
+    trackWebsiteEvent({
+      eventType: 'newsletter_subscribe',
+      page: resolvedPage,
+      targetType: 'form',
+      targetId: 'newsletter-form',
+      targetLabel: 'Newsletter Subscription',
+    })
+  }
+
+  const submitContact = async (event) => {
+    event.preventDefault()
+    if (contactStatus === 'loading') return
+
+    const normalizedName = String(contactForm.name || '').trim()
+    const normalizedEmail = String(contactForm.email || '').trim()
+    const normalizedCompany = String(contactForm.company || '').trim()
+    const normalizedService = String(contactForm.service || '').trim()
+    const normalizedMessage = String(contactForm.message || '').trim()
+
+    if (normalizedName.length < 2 || !EMAIL_REGEX.test(normalizedEmail) || normalizedMessage.length < 10) {
+      setContactStatus('error')
+      setContactMessage('Please fill in your name, valid email, and message.')
+      return
+    }
+
+    setContactStatus('loading')
+    setContactMessage('')
+
+    try {
+      const response = await apiFetch('/notifications/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        skipAuthRefreshRetry: true,
+        body: JSON.stringify({
+          name: normalizedName,
+          email: normalizedEmail,
+          company: normalizedCompany,
+          service: normalizedService,
+          message: normalizedMessage,
+        }),
+      })
+      const responseBody = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        setContactStatus('error')
+        setContactMessage(responseBody?.message || 'Unable to send your message right now. Please try again shortly.')
+        return
+      }
+
+      try {
+        await apiFetch('/users/public/support-leads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          skipAuthRefreshRetry: true,
+          body: JSON.stringify({
+            fullName: normalizedName,
+            email: normalizedEmail,
+            companyName: normalizedCompany,
+            capturePage: 'contact',
+            capturePath: typeof window !== 'undefined' ? window.location.pathname : '',
+            source: 'contact-form',
+            status: 'new',
+            interest: normalizedService,
+            notes: normalizedMessage,
+          }),
+        })
+      } catch {
+        // Email delivery already succeeded; support lead sync can retry through other lead capture flows.
+      }
+    } catch {
+      setContactStatus('error')
+      setContactMessage('Unable to reach the contact service right now. Please try again shortly.')
+      return
+    }
+
+    setContactStatus('success')
+    setContactMessage('Thank you. Your message has been sent and our team will respond shortly.')
+    trackWebsiteEvent({
+      eventType: 'contact_submit',
+      page: 'contact',
+      targetType: 'form',
+      targetId: 'contact-form',
+      targetLabel: 'Contact Form Submission',
+      metadata: {
+        company: normalizedCompany,
+        service: normalizedService,
+      },
+    })
+    setContactForm({ name: '', email: '', company: '', service: '', message: '' })
+  }
+
+  const primaryButtonClass = 'inline-flex items-center justify-center rounded-full bg-[#153585] px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_26px_rgba(21,53,133,0.24)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#1f4aa8] hover:shadow-[0_18px_36px_rgba(21,53,133,0.3)]'
+  const secondaryButtonClass = 'inline-flex items-center justify-center rounded-full border border-[#153585]/25 bg-white px-6 py-3 text-sm font-semibold text-[#153585] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#153585]/45 hover:shadow-[0_10px_18px_rgba(21,53,133,0.12)]'
+
+  const renderHeroSection = ({
+    eyebrow,
+    title,
+    body,
+    image,
+    children = null,
+    large = false,
+  }) => (
+    <section className={`relative overflow-hidden bg-[#073D7F] text-white ${large ? '' : 'py-24'}`}>
+      <div className="absolute inset-0">
+        <img
+          src={`${WEBSITE_ASSET_BASE}/${image}`}
+          alt=""
+          className="h-full w-full object-cover opacity-25"
+        />
+      </div>
+      <div className="absolute inset-0 bg-[#073D7F]/20" />
+      <div className={`relative mx-auto max-w-7xl px-6 lg:px-8 ${large ? 'grid gap-14 py-20 lg:grid-cols-[1.15fr_0.85fr] lg:py-28' : ''}`}>
+        <div className="max-w-5xl">
+          <div className="text-sm font-semibold uppercase tracking-[0.24em] text-[#6491DE]">
+            {eyebrow}
+          </div>
+          <h1 className={`mt-4 font-semibold tracking-tight ${large ? 'max-w-4xl text-4xl leading-tight sm:text-5xl lg:text-6xl' : 'text-4xl sm:text-5xl'}`}>
+            {title}
+          </h1>
+          <p className="mt-6 max-w-3xl text-lg leading-8 text-blue-100">{body}</p>
+          {children}
+        </div>
+      </div>
+    </section>
+  )
+
   const renderNewsletterSection = () => (
-    <section className="border-t border-slate-200 bg-[linear-gradient(165deg,#f4f8ff,#ffffff)] py-16 md:py-20">
-      <div className="mx-auto w-[min(980px,92vw)]">
-        <Reveal className="rounded-[28px] border border-[#153585]/15 bg-white p-8 text-center shadow-[0_18px_32px_rgba(15,23,42,0.08)] md:p-12">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#153585]">Newsletter & Lead Capture</p>
-          <h2 className="mt-3 text-3xl font-semibold text-[#111827] md:text-4xl">Subscribe for Executive Finance Insights</h2>
-          <p className="mx-auto mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-            Get updates on accounting, compliance, tax, and advisory topics. Tell us the service area you want to hear about.
-          </p>
-          <form onSubmit={submitNewsletterLead} className="mx-auto mt-8 grid max-w-3xl gap-4 rounded-2xl border border-[#153585]/15 bg-[#f7f9ff] p-4 text-left md:grid-cols-3 md:p-6">
-            <label className="text-sm font-semibold text-slate-700">
-              Full Name
-              <input
-                value={newsletterLeadForm.fullName}
-                onChange={(event) => {
-                  setNewsletterSubmitted(false)
-                  clearNewsletterError('fullName')
-                  setNewsletterLeadForm((prev) => ({ ...prev, fullName: event.target.value }))
-                }}
-                className={`mt-1.5 w-full rounded-xl border px-4 py-2.5 outline-none transition focus:ring-2 ${
-                  newsletterErrors.fullName
-                    ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
-                    : 'border-slate-300 focus:border-[#153585]/50 focus:ring-[#153585]/20'
-                }`}
-                required
-                aria-invalid={Boolean(newsletterErrors.fullName)}
-              />
-              {newsletterErrors.fullName && <p className="mt-1 text-xs font-medium text-red-600">{newsletterErrors.fullName}</p>}
-            </label>
-            <label className="text-sm font-semibold text-slate-700">
-              Email
-              <input
-                type="email"
-                value={newsletterLeadForm.email}
-                onChange={(event) => {
-                  setNewsletterSubmitted(false)
-                  clearNewsletterError('email')
-                  setNewsletterLeadForm((prev) => ({ ...prev, email: event.target.value }))
-                }}
-                className={`mt-1.5 w-full rounded-xl border px-4 py-2.5 outline-none transition focus:ring-2 ${
-                  newsletterErrors.email
-                    ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
-                    : 'border-slate-300 focus:border-[#153585]/50 focus:ring-[#153585]/20'
-                }`}
-                required
-                aria-invalid={Boolean(newsletterErrors.email)}
-              />
-              {newsletterErrors.email && <p className="mt-1 text-xs font-medium text-red-600">{newsletterErrors.email}</p>}
-            </label>
-            <label className="text-sm font-semibold text-slate-700">
-              Topics You'd Like to Receive
-              <select
-                value={newsletterLeadForm.serviceFocus}
-                onChange={(event) => {
-                  setNewsletterSubmitted(false)
-                  clearNewsletterError('serviceFocus')
-                  setNewsletterLeadForm((prev) => ({ ...prev, serviceFocus: event.target.value }))
-                }}
-                className={`mt-1.5 w-full rounded-xl border bg-white px-4 py-2.5 outline-none transition focus:ring-2 ${
-                  newsletterErrors.serviceFocus
-                    ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
-                    : 'border-slate-300 focus:border-[#153585]/50 focus:ring-[#153585]/20'
-                }`}
-                aria-invalid={Boolean(newsletterErrors.serviceFocus)}
-              >
-                <option value="Business Insights & Financial Strategy">Business Insights & Financial Strategy</option>
-                <option value="Tax Updates & Compliance Alerts">Tax Updates & Compliance Alerts</option>
-                <option value="Accounting & Reporting Best Practices">Accounting & Reporting Best Practices</option>
-                <option value="Payroll & Workforce Compliance">Payroll & Workforce Compliance</option>
-                <option value="CFO Advisory & Growth Planning">CFO Advisory & Growth Planning</option>
-              </select>
-              {newsletterErrors.serviceFocus && <p className="mt-1 text-xs font-medium text-red-600">{newsletterErrors.serviceFocus}</p>}
-            </label>
-            <div className="md:col-span-3">
-              <button type="submit" className={`${primaryButtonClass} w-full md:w-auto`}>Subscribe</button>
-              {newsletterSubmitted && (
-                <p className="mt-3 text-xs font-semibold text-green-700">Subscription received. Our advisory team will keep you updated.</p>
-              )}
+    <section className="border-t border-[#D9E3F4] bg-white">
+      <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
+        <div className="grid gap-8 rounded-[2rem] bg-[#073D7F] px-8 py-10 text-white lg:grid-cols-[1fr_auto] lg:items-center lg:px-10">
+          <div>
+            <div className="text-sm font-semibold uppercase tracking-[0.24em] text-[#6491DE]">
+              Email subscription
             </div>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight">
+              Stay informed with practical finance, payroll, and compliance insights.
+            </h2>
+            <p className="mt-4 max-w-2xl text-base leading-8 text-blue-100">
+              Subscribe to receive clear, practical insights on accounting, tax compliance, payroll, and financial strategy.
+            </p>
+          </div>
+          <form onSubmit={submitNewsletter} className="grid gap-3 sm:grid-cols-[1fr_auto] lg:min-w-[420px]">
+            <input
+              type="text"
+              value={newsletterForm.fullName}
+              onChange={(event) => setNewsletterForm((prev) => ({ ...prev, fullName: event.target.value }))}
+              placeholder="Full name"
+              className="rounded-full border border-white/10 bg-white px-5 py-3 text-sm text-slate-900 outline-none"
+            />
+            <input
+              type="email"
+              value={newsletterForm.email}
+              onChange={(event) => setNewsletterForm((prev) => ({ ...prev, email: event.target.value }))}
+              placeholder="Email address"
+              className="rounded-full border border-white/10 bg-white px-5 py-3 text-sm text-slate-900 outline-none"
+            />
+            <button
+              type="submit"
+              disabled={newsletterStatus === 'loading'}
+              className="rounded-full bg-[#6491DE] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#4F7FD1] disabled:cursor-not-allowed disabled:opacity-70 sm:col-span-2 lg:col-span-1"
+            >
+              {newsletterStatus === 'loading' ? 'Connecting...' : 'Subscribe'}
+            </button>
+            {newsletterMessage ? (
+              <div className="rounded-2xl bg-white/10 px-4 py-3 text-sm leading-7 text-blue-100 sm:col-span-2">
+                {newsletterMessage}
+              </div>
+            ) : null}
           </form>
-        </Reveal>
+        </div>
+      </div>
+    </section>
+  )
+
+  const renderConsultationSection = () => (
+    <section className="bg-[#F1F1F1]">
+      <div className="mx-auto grid max-w-7xl gap-10 px-6 py-20 lg:grid-cols-[0.95fr_1.05fr] lg:px-8">
+        <SectionHeading
+          eyebrow="Book a Consultation"
+          title="Gain financial clarity. Make better decisions. Scale with confidence."
+          body="Schedule a focused consultation to assess your financial structure, reporting gaps, and growth priorities."
+        />
+        <div className="rounded-[2rem] bg-white p-5 shadow-xl ring-1 ring-[#D9E3F4]">
+          <div className="mb-6 rounded-2xl border border-[#D9E3F4] bg-[#F1F1F1] p-5">
+            <div className="text-sm font-semibold text-[#073D7F]">
+              What happens after booking:
+            </div>
+            <ul className="mt-3 space-y-2 text-sm text-slate-600">
+              <li>Review of your current accounting and reporting setup</li>
+              <li>Identification of gaps and risks</li>
+              <li>Clear recommendation on next steps</li>
+            </ul>
+          </div>
+          <div className="overflow-hidden rounded-[1.5rem] border border-[#D9E3F4] bg-[#F1F1F1]">
+            <iframe
+              src={CALENDAR_BOOKING_URL}
+              title="Book a consultation with Kiamina Accounting Services"
+              className="h-[560px] w-full"
+            />
+          </div>
+        </div>
       </div>
     </section>
   )
 
   const renderHomePage = () => (
     <>
-      <HeroPanel pageKey="home" scrollY={scrollY}>
-        <div className="grid gap-8 lg:grid-cols-[1.25fr_0.95fr]">
-          <Reveal className="space-y-6 text-center lg:text-left">
-            <span className="mx-auto inline-flex rounded-full border border-white/35 bg-white/10 px-4 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-white lg:mx-0">Trusted Global Accounting Advisory Partner</span>
-            <h1 className="text-balance text-4xl font-semibold leading-tight text-white sm:text-5xl">
-              Financial Reporting, Financial Advisory, & Tax Compliance Services in Port Harcourt, Nigeria
-
+      <section className="relative overflow-hidden bg-[#073D7F] text-white">
+        <div className="absolute inset-0">
+          <img
+            src={`${WEBSITE_ASSET_BASE}/hero.png`}
+            alt="Financial professionals"
+            className="h-full w-full object-cover opacity-30"
+          />
+        </div>
+        <div className="relative mx-auto grid max-w-7xl gap-14 px-6 py-20 lg:grid-cols-[1.15fr_0.85fr] lg:px-8 lg:py-28">
+          <div>
+            <div className="mb-6 inline-flex items-center rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm text-blue-100">
+              Serving businesses and nonprofits across Nigeria, Canada, United States, United Kingdom, Australia, and Ireland
+            </div>
+            <h1 className="max-w-4xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
+              Financial clarity that strengthens control, improves decisions, and supports scalable growth.
             </h1>
-            <p className="mx-auto max-w-3xl text-lg text-blue-50 lg:mx-0">
-              Supporting Businesses and Not-for-Profit Organizations Across Nigeria and International Markets
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-blue-100">
+              CFO-level insight, structured financial systems, and decision-ready reporting for businesses and nonprofits that expect more than routine accounting.
             </p>
-            <p className="mx-auto max-w-3xl text-blue-100/95 lg:mx-0">
-              Kiamina Accounting Services delivers structured accounting, bookkeeping, tax compliance, payroll, and financial advisory support using cloud-enabled systems with IFRS, GAAP, and US GAAP alignment for cross-border operations.
-            </p>
-            <div className="flex flex-wrap justify-center gap-3 lg:justify-start">
-              <button
-                type="button"
-                onClick={() => handleEngageService({
-                  sourcePage: 'home',
-                  sourceId: 'hero-get-started',
-                  sourceLabel: 'Hero Get Started',
-                })}
-                className={primaryButtonClass}
-              >
-                Get Started
+            <div className="mt-10 flex flex-col gap-4 sm:flex-row">
+              <button type="button" onClick={() => handleNavigate('contact')} className="rounded-full bg-[#6491DE] px-7 py-3.5 text-center text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#4F7FD1]">
+                Book a Free Consultation
               </button>
-              <a
-                href={CALENDAR_BOOKING_URL}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => trackWebsiteEvent({
-                  eventType: 'cta_click',
-                  page: 'home',
-                  targetType: 'cta',
-                  targetId: 'hero-schedule-call',
-                  targetLabel: 'Hero Schedule a Call',
-                })}
-                className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/20"
-              >
-                Schedule a Call
-              </a>
+              <button type="button" onClick={() => handleNavigate('services')} className="rounded-full border border-white/20 px-7 py-3.5 text-center text-sm font-semibold text-white transition hover:bg-white/5">
+                See How We Can Help
+              </button>
             </div>
-          </Reveal>
-          <Reveal delayMs={120}>
-            <SurfaceCard className="border-white/20 bg-white/95 backdrop-blur">
-              <BrandImage
-                src="https://unsplash.com/photos/Q80LYxv_Tbs/download?force=true&w=1200"
-                fallbackSrc="/img/hero-boardroom.svg"
-                alt="Executive accounting advisory illustration"
-                className="mb-4 h-44 w-full"
-              />
-              <h2 className="text-xl font-semibold text-[#111827]">Strategic Positioning</h2>
-              <ul className="mt-4 space-y-3 text-sm text-slate-600">
-                <li>Compliance-driven and audit-ready operating model</li>
-                <li>Technology-enabled accounting control environment</li>
-                <li>Investor-ready reporting standards and cadence</li>
-                <li>Cross-border capable advisory delivery</li>
-              </ul>
-            </SurfaceCard>
-          </Reveal>
-        </div>
-      </HeroPanel>
-
-      <SectionShell>
-        <Reveal className="mb-10">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#153585]">Business Risk</p>
-          <h2 className="mt-3 text-3xl font-semibold text-[#111827]">Where Financial Weakness Creates Strategic Exposure</h2>
-        </Reveal>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
-          {[
-            { icon: FileText, text: 'Poor bookkeeping', desc: 'Inaccurate records lead to poor decisions' },
-            { icon: ShieldCheck, text: 'Weak internal controls', desc: 'Increased fraud and error risk' },
-            { icon: Clock3, text: 'Delayed reporting', desc: 'Missed insights and opportunities' },
-            { icon: Scale, text: 'Tax non-compliance', desc: 'Penalties and legal issues' },
-            { icon: AlertTriangle, text: 'Regulatory penalties', desc: 'Fines and sanctions' },
-            { icon: Building2, text: 'Reputational damage', desc: 'Loss of stakeholder trust' },
-            { icon: Wallet, text: 'Cash flow instability', desc: 'Operational disruptions' },
-          ].map((item, idx) => (
-            <Reveal key={item.text} delayMs={idx * 40}>
-              <article className="h-full rounded-2xl border border-red-200 bg-white p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_18px_32px_rgba(220,38,38,0.15)] group">
-                <div className="mb-3 inline-flex rounded-full bg-red-100 p-2 text-red-600 group-hover:bg-red-600 group-hover:text-white transition-colors">
-                  <item.icon className="h-5 w-5" />
-                </div>
-                <h3 className="text-base font-semibold text-[#111827]">{item.text}</h3>
-                <p className="mt-1 text-xs text-slate-500">{item.desc}</p>
-              </article>
-            </Reveal>
-          ))}
-        </div>
-      </SectionShell>
-
-      <SectionShell tint>
-        <Reveal className="mb-10">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#153585]">Strategic Solution Positioning</p>
-          <h2 className="mt-3 text-3xl font-semibold text-[#111827]">Built for Compliance, Structured for Scale</h2>
-        </Reveal>
-        <div className="grid gap-6 lg:grid-cols-[1fr_1fr] lg:items-stretch">
-          <Reveal className="h-full">
-            <SurfaceCard className="h-full overflow-hidden p-0">
-              <BrandImage
-                src="https://images.unsplash.com/photo-1573497491765-dccce02b29df?w=1400"
-                fallbackSrc="/img/hero-home-bg.svg"
-                alt="Strategic advisory leadership team"
-                className="h-full min-h-[320px] w-full rounded-none"
-              />
-            </SurfaceCard>
-          </Reveal>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {[
-              { icon: CheckCircle2, text: 'Compliance-driven', desc: 'Always audit-ready' },
-              { icon: Award, text: 'Audit-ready', desc: 'Stress-free reviews' },
-              { icon: TrendingUp, text: 'Investor-ready', desc: 'Growth positioning' },
-              { icon: FileBarChart2, text: 'Structured', desc: 'Process excellence' },
-              { icon: CloudCog, text: 'Technology-enabled', desc: 'Cloud-first approach' },
-              { icon: Globe2, text: 'Cross-border', desc: 'Global expertise' },
-            ].map((item, idx) => (
-              <Reveal key={item.text} delayMs={idx * 40}>
-                <article className="rounded-2xl border border-[#153585]/15 bg-white p-5 text-center transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_18px_32px_rgba(21,53,133,0.15)] group">
-                  <div className="mb-3 inline-flex rounded-full bg-[#153585]/10 p-3 text-[#153585] group-hover:bg-[#153585] group-hover:text-white transition-colors">
-                    <item.icon className="h-6 w-6" />
-                  </div>
-                  <h3 className="text-base font-semibold text-[#111827]">{item.text}</h3>
-                  <p className="mt-1 text-xs text-slate-500">{item.desc}</p>
-                </article>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </SectionShell>
-
-      <SectionShell>
-        <Reveal className="mb-10">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#153585]">Service Pillars</p>
-          <h2 className="mt-3 text-3xl font-semibold text-[#111827]">Enterprise Accounting Capabilities</h2>
-        </Reveal>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {[
-            { icon: FileText, text: 'Bookkeeping', desc: 'Daily transaction management' },
-            { icon: BarChart3, text: 'Financial Reporting', desc: 'Statutory & management reports' },
-            { icon: PieChart, text: 'Management Reporting', desc: 'KPI dashboards & analysis' },
-            { icon: Wallet, text: 'CFO Consulting', desc: 'Strategic finance leadership' },
-            { icon: Calculator, text: 'Financial Modeling', desc: 'Scenario & sensitivity analysis' },
-            { icon: CreditCard, text: 'Payroll Processing', desc: 'Accurate & compliant payroll' },
-            { icon: Landmark, text: 'AP/AR Management', desc: 'Working capital optimization' },
-            { icon: Scale, text: 'Tax Compliance', desc: 'Tax planning & filing' },
-          ].map((item, idx) => (
-            <Reveal key={item.text} delayMs={idx * 40}>
-              <article className="h-full rounded-2xl border border-slate-200 bg-white p-5 text-center transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_18px_32px_rgba(15,23,42,0.08)] group">
-                <div className="mb-3 inline-flex rounded-full bg-[#153585]/10 p-3 text-[#153585] group-hover:bg-[#153585] group-hover:text-white transition-colors">
-                  <item.icon className="h-6 w-6" />
-                </div>
-                <h3 className="text-base font-semibold text-[#111827]">{item.text}</h3>
-                <p className="mt-1 text-xs text-slate-500">{item.desc}</p>
-              </article>
-            </Reveal>
-          ))}
-        </div>
-      </SectionShell>
-
-      <SectionShell tint>
-        <Reveal className="mb-10">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#153585]">Industries Served</p>
-          <h2 className="mt-3 text-3xl font-semibold text-[#111827]">Coverage Across Regulated Sectors</h2>
-        </Reveal>
-        <Reveal>
-          <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-[#f3f6ff] p-4 sm:p-6">
-            <div className="flex w-max gap-5 motion-safe:[animation:preliminaryIndustryCarousel_42s_linear_infinite] hover:[animation-play-state:paused]">
-              {[...INDUSTRIES, ...INDUSTRIES].map((industry, index) => (
-                <article
-                  key={`industry-carousel-${industry.name}-${index}`}
-                  className="w-[280px] flex-shrink-0 overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.08)] sm:w-[330px]"
-                >
-                  <BrandImage
-                    src={industry.image}
-                    fallbackSrc={industry.fallback}
-                    alt={`${industry.name} industry illustration`}
-                    className="h-44 w-full rounded-none object-cover"
-                  />
-                  <div className="p-5">
-                    <span className="inline-flex rounded-full bg-[#e6ebfb] px-4 py-1 text-xs font-semibold uppercase tracking-wide text-[#153585]">Industry</span>
-                    <h3 className="mt-4 text-2xl font-semibold leading-tight text-[#031247]">
-                      {industry.name}
-                    </h3>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        </Reveal>
-      </SectionShell>
-
-      <SectionShell>
-        <Reveal className="mb-10">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#153585]">Software Expertise</p>
-          <h2 className="mt-3 text-3xl font-semibold text-[#111827]">Cloud Platforms We Operate</h2>
-        </Reveal>
-        <Reveal>
-          <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-[#f3f3f5] px-4 py-8 sm:px-8">
-            <div className="flex w-max items-center gap-10 motion-safe:[animation:preliminarySoftwareCarousel_30s_linear_infinite] hover:[animation-play-state:paused]">
-              {[...SOFTWARE_EXPERTISE, ...SOFTWARE_EXPERTISE].map((software, index) => (
-                <div
-                  key={`software-logo-${software.name}-${index}`}
-                  className="flex min-w-[170px] flex-shrink-0 items-center justify-center sm:min-w-[210px]"
-                >
-                  <BrandImage
-                    src={software.logo}
-                    fallbackSrc={software.fallback}
-                    alt={`${software.name} logo`}
-                    className="h-14 w-auto max-w-[170px] rounded-none object-contain sm:h-16 sm:max-w-[210px]"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </Reveal>
-      </SectionShell>
-
-      <SectionShell tint>
-        <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
-          <Reveal className="rounded-2xl border border-[#153585]/20 bg-[#153585] p-8 text-left text-blue-50 shadow-[0_18px_38px_rgba(21,53,133,0.28)]">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-100">Trust Indicators</p>
-            <h2 className="mt-3 text-3xl font-semibold text-white">Executive Confidence, Compliance Discipline</h2>
-            <p className="mt-4 text-blue-100/90">
-              Kiamina Accounting Services is positioned as a strategic, compliance-driven, globally credible advisory practice built with Big 4-style delivery rigor.
+            <p className="mt-4 text-sm text-blue-100">
+              No obligation. We will review your accounting, reporting, payroll, or compliance needs and recommend the right next step.
             </p>
-          </Reveal>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {TRUST_INDICATORS.map((indicator, index) => (
-              <Reveal key={indicator.id} delayMs={(index % 2) * 70}>
-                <SurfaceCard className="h-full border-[#153585]/15 bg-white">
-                  <div className="mb-4 inline-flex rounded-full bg-[#153585]/10 p-3 text-[#153585]">
-                    <indicator.Icon className="h-5 w-5" />
+            <div className="mt-12 grid gap-4 sm:grid-cols-2">
+              {[
+                'Nigeria-based firm serving clients across six active markets',
+                'CFO-level insight without full-time CFO cost',
+                'Clear reporting built for executive decisions',
+                'Remote delivery with structured financial systems',
+              ].map((item) => (
+                <div key={item} className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-blue-100 shadow-2xl shadow-black/10">
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur">
+            <div className="rounded-[1.5rem] bg-white p-6 text-slate-900">
+              <div className="text-sm font-semibold uppercase tracking-[0.24em] text-[#6491DE]">
+                Executive Finance Snapshot
+              </div>
+              <div className="mt-5 grid gap-4">
+                <div className="rounded-2xl bg-[#F1F1F1] p-5">
+                  <div className="text-sm text-slate-500">Reporting standard</div>
+                  <div className="mt-2 text-2xl font-semibold">Decision-ready monthly reporting</div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-2xl bg-[#F1F1F1] p-5">
+                    <div className="text-sm text-slate-500">Delivery model</div>
+                    <div className="mt-2 text-lg font-semibold">Remote across 6 countries</div>
                   </div>
-                  <h3 className="text-base font-semibold text-[#111827]">{indicator.title}</h3>
-                  <p className="mt-2 text-sm text-slate-600">{indicator.detail}</p>
-                  <div className="mt-4 border-t border-slate-200 pt-3">
-                    <CountUpMetric value={indicator.metric} className="text-xl font-semibold text-[#153585]" />
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{indicator.metricLabel}</p>
+                  <div className="rounded-2xl bg-[#F1F1F1] p-5">
+                    <div className="text-sm text-slate-500">Strategic value</div>
+                    <div className="mt-2 text-lg font-semibold">CFO-level guidance</div>
                   </div>
-                </SurfaceCard>
-              </Reveal>
+                </div>
+                <div className="rounded-2xl bg-[#073D7F] p-5 text-white">
+                  <div className="text-sm text-blue-100">Built for</div>
+                  <div className="mt-2 text-lg font-semibold">Founders, CEOs, CFOs, and serious growth-stage businesses</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-[#D9E3F4] bg-white">
+        <div className="mx-auto grid max-w-7xl gap-6 px-6 py-8 md:grid-cols-4 lg:px-8">
+          {[
+            'Serving clients across 6 active markets',
+            'Trusted by businesses and nonprofits',
+            'CFO-level insight without full-time CFO cost',
+            'Structured reporting, payroll, and compliance support',
+          ].map((item) => (
+            <div key={item} className="rounded-2xl border border-[#D9E3F4] bg-[#F1F1F1] p-5 text-sm font-semibold leading-6 text-[#073D7F]">
+              {item}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="bg-white">
+        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+          <SectionHeading
+            eyebrow="Who We Help"
+            title="Built for leaders who need financial clarity, not just bookkeeping."
+            body="Kiamina supports organizations that need reliable records, stronger compliance, better reporting, and strategic financial visibility."
+          />
+          <div className="mt-12 grid gap-6 md:grid-cols-3">
+            {[
+              {
+                title: 'Growing Businesses',
+                body: 'For founders and CEOs who need clean books, better reporting, and stronger financial control.',
+              },
+              {
+                title: 'Nonprofits',
+                body: 'For organizations that need fund accountability, transparent reporting, and compliance discipline.',
+              },
+              {
+                title: 'International Operators',
+                body: 'For businesses and nonprofits needing remote accounting support across Nigeria, UK, US, Canada, Australia, and Ireland.',
+              },
+            ].map((item) => (
+              <div key={item.title} className="rounded-[1.75rem] border border-[#D9E3F4] bg-[#F1F1F1] p-7">
+                <h3 className="text-xl font-semibold text-slate-950">{item.title}</h3>
+                <p className="mt-4 text-sm leading-7 text-slate-600">{item.body}</p>
+              </div>
             ))}
           </div>
         </div>
-      </SectionShell>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+        <SectionHeading
+          eyebrow="Services"
+          title="Financial operations, reporting, and strategic advisory designed for businesses and nonprofits that need clarity at leadership level."
+          body="Each service is structured around an organizational problem, the operating outcome it delivers, and the type of organization it best supports."
+        />
+        <div className="mt-12 grid gap-6 lg:grid-cols-2">
+          {SERVICES.map((service) => (
+            <div key={service.title} className="rounded-[1.75rem] border border-[#D9E3F4] bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+              <IconBadge icon={service.Icon} />
+              <h3 className="text-xl font-semibold text-slate-950">{service.title}</h3>
+              <div className="mt-5 space-y-4 text-sm leading-7 text-slate-600">
+                <p><span className="font-semibold text-slate-900">Problem:</span> {service.problem}</p>
+                <p><span className="font-semibold text-slate-900">Outcome:</span> {service.outcome}</p>
+                <p><span className="font-semibold text-slate-900">Best suited for:</span> {service.fit}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button type="button" onClick={() => handleNavigate('services')} className="mt-10 inline-flex rounded-full bg-[#073D7F] px-6 py-3 text-sm font-semibold text-white">
+          Explore all services
+        </button>
+      </section>
+
+      <section className="bg-[#F1F1F1]">
+        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+          <div className="grid gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+            <SectionHeading
+              eyebrow="Why Kiamina"
+              title="A financial growth partner for leaders who need precision, visibility, and strategic finance capability."
+              body="Kiamina delivers financial accuracy, reporting clarity, and strategic finance support in one operating model."
+            />
+            <div className="grid gap-6 sm:grid-cols-2">
+              {DIFFERENTIATORS.map((item) => (
+                <div key={item.title} className="rounded-[1.75rem] bg-white p-7 shadow-sm ring-1 ring-[#D9E3F4]">
+                  <IconBadge icon={item.Icon} />
+                  <h3 className="text-lg font-semibold text-slate-950">{item.title}</h3>
+                  <p className="mt-3 text-sm leading-7 text-slate-600">{item.body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+        <SectionHeading
+          eyebrow="Industries Served"
+          title="Financial support shaped around operational complexity, regulatory demands, and sector-specific reporting needs."
+        />
+        <div className="mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {INDUSTRIES.map((industry) => (
+            <div key={industry.title} className="rounded-[1.75rem] border border-[#D9E3F4] bg-white p-7 transition hover:-translate-y-1 hover:shadow-lg">
+              <IconBadge icon={industry.Icon} />
+              <div className="text-lg font-semibold text-slate-950">{industry.title}</div>
+              <p className="mt-3 text-sm leading-7 text-slate-600">{industry.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="bg-[#073D7F] text-white">
+        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+          <SectionHeading
+            eyebrow="How It Works"
+            title="A clean process that reduces friction and builds confidence from the first conversation."
+            invert
+          />
+          <div className="mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+            {PROCESS_STEPS.map((step, index) => (
+              <div key={step.title} className="rounded-[1.75rem] border border-white/10 bg-white/5 p-7">
+                <IconBadge icon={step.Icon} dark />
+                <div className="text-sm font-semibold text-[#6491DE]">0{index + 1}</div>
+                <div className="mt-4 text-xl font-semibold">{step.title}</div>
+                <p className="mt-3 text-sm leading-7 text-blue-100">{step.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+        <div className="grid gap-8 lg:grid-cols-2">
+          {TESTIMONIALS.map((testimonial) => (
+            <div key={testimonial.company} className="flex flex-col justify-between rounded-[1.75rem] bg-[#F1F1F1] p-10 ring-1 ring-[#D9E3F4]">
+              <p className="text-xl leading-8 text-slate-700">"{testimonial.text}"</p>
+              <div className="mt-8 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-[#D9E3F4] bg-white p-2">
+                    <img src={testimonial.logo} alt={testimonial.company} className="h-full w-full object-contain" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-slate-950">{testimonial.company}</div>
+                    <div className="text-xs text-slate-500">{testimonial.country}</div>
+                  </div>
+                </div>
+                <span className="rounded-full border border-[#D9E3F4] bg-white px-3 py-1 text-xs text-slate-700">
+                  {testimonial.tag}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {renderNewsletterSection()}
+      {renderConsultationSection()}
+      <div className="fixed bottom-4 left-1/2 z-50 w-[92%] max-w-md -translate-x-1/2 lg:hidden">
+        <button
+          type="button"
+          onClick={() => handleNavigate('contact')}
+          className="block w-full rounded-full bg-[#073D7F] px-6 py-4 text-center text-sm font-semibold text-white shadow-xl"
+        >
+          Book a Free Consultation (Limited Slots Weekly)
+        </button>
+      </div>
     </>
   )
 
   const renderAboutPage = () => (
     <>
-      <HeroPanel pageKey="about" scrollY={scrollY}>
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <Reveal className="space-y-5 text-center lg:text-left">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-100">About</p>
-            <h1 className="mt-3 text-4xl font-semibold text-white">Financial Clarity, Regulatory Confidence, Strategic Control</h1>
-          </Reveal>
-          <Reveal delayMs={120}>
-            <SurfaceCard className="p-4">
-              <BrandImage
-                src="https://unsplash.com/photos/VpcgTEKerEQ/download?force=true&w=1200"
-                fallbackSrc="/img/about-framework.svg"
-                alt="Accounting governance framework illustration"
-                className="h-48 w-full"
-              />
-            </SurfaceCard>
-          </Reveal>
+      {renderHeroSection({
+        eyebrow: 'About Kiamina',
+        title: 'A Nigeria-based accounting and advisory firm built for business leaders who need more than basic compliance.',
+        body: 'Kiamina Accounting Services combines financial accuracy, reporting clarity, and strategic finance support for companies operating across multiple jurisdictions.',
+        image: 'about.png',
+      })}
+      <section className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+        <img
+          src={`${WEBSITE_ASSET_BASE}/about.png`}
+          alt="About Kiamina Accounting Services"
+          className="mb-10 h-[360px] w-full rounded-[2rem] object-cover"
+        />
+        <div className="grid gap-12 lg:grid-cols-2">
+          <div>
+            <div className="text-sm font-semibold uppercase tracking-[0.24em] text-[#6491DE]">Our Mission</div>
+            <p className="mt-4 text-lg leading-8 text-slate-600">
+              To empower businesses and nonprofits with accurate accounting systems, compliant tax structures, and strategic financial insight that support long term growth, transparency, and accountability.
+            </p>
+            <div className="mt-10 text-sm font-semibold uppercase tracking-[0.24em] text-[#6491DE]">Our Vision</div>
+            <p className="mt-4 text-lg leading-8 text-slate-600">
+              To redefine accounting and financial advisory as a strategic growth engine for businesses and mission-driven organizations worldwide.
+            </p>
+          </div>
+          <div className="rounded-[2rem] border border-[#D9E3F4] bg-[#F1F1F1] p-8">
+            <div className="text-sm font-semibold uppercase tracking-[0.24em] text-[#6491DE]">Core Values</div>
+            <ul className="mt-6 space-y-4 text-sm leading-7 text-slate-600">
+              {[
+                ['Accuracy', 'Precision in financial reporting and data integrity underpins every engagement.'],
+                ['Integrity', 'We operate with uncompromising ethical standards and transparent accountability.'],
+                ['Compliance', 'Strict adherence to statutory, regulatory, and professional requirements across all jurisdictions.'],
+                ['Partnership', 'Long-term client relationships built on trust, alignment, and shared objectives.'],
+                ['Continuous Improvement', 'Ongoing refinement of processes, systems, and expertise in response to evolving environments.'],
+              ].map(([title, body]) => (
+                <li key={title}>
+                  <span className="font-semibold text-slate-900">{title}:</span> {body}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
-      </HeroPanel>
-
-      <SectionShell>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Reveal>
-            <SurfaceCard>
-              <div className="flex items-center gap-3">
-                <div className="rounded-full bg-[#153585]/10 p-2">
-                  <Building2 className="h-5 w-5 text-[#153585]" />
-                </div>
-                <h2 className="text-2xl font-semibold text-[#111827]">Firm Overview</h2>
+      </section>
+      <section className="bg-[#F1F1F1]">
+        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+          <SectionHeading
+            eyebrow="Why clients choose Kiamina"
+            title="Built for executives who value control, precision, and professional execution."
+          />
+          <div className="mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+            {DIFFERENTIATORS.map((item) => (
+              <div key={item.title} className="rounded-[1.75rem] bg-white p-7 shadow-sm ring-1 ring-[#D9E3F4]">
+                <IconBadge icon={item.Icon} />
+                <h3 className="text-lg font-semibold text-slate-950">{item.title}</h3>
+                <p className="mt-3 text-sm leading-7 text-slate-600">{item.body}</p>
               </div>
-              <p className="mt-3 text-slate-600">
-                Kiamina Accounting Services is a compliance-centered finance advisory firm that helps organizations establish reliable accounting systems, enforce tax discipline, and improve executive reporting control.
-              </p>
-            </SurfaceCard>
-          </Reveal>
-          <Reveal>
-            <SurfaceCard>
-              <div className="flex items-center gap-3">
-                <div className="rounded-full bg-[#153585]/10 p-2">
-                  <Target className="h-5 w-5 text-[#153585]" />
-                </div>
-                <h2 className="text-2xl font-semibold text-[#111827]">Mission</h2>
-              </div>
-              <p className="mt-3 text-slate-600">Empower organizations with accurate systems, compliant tax structures, and strategic financial insight.</p>
-              <div className="mt-6 flex items-center gap-3">
-                <div className="rounded-full bg-[#153585]/10 p-2">
-                  <Lightbulb className="h-5 w-5 text-[#153585]" />
-                </div>
-                <h2 className="text-2xl font-semibold text-[#111827]">Vision</h2>
-              </div>
-              <p className="mt-3 text-slate-600">Redefine accounting as a strategic growth engine worldwide.</p>
-            </SurfaceCard>
-          </Reveal>
-        </div>
-      </SectionShell>
-
-      <SectionShell>
-        <Reveal className="mb-8">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#153585]">Why Choose Us</p>
-          <h2 className="mt-3 text-3xl font-semibold text-[#111827]">Our Distinctive Strengths</h2>
-        </Reveal>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {[
-            { icon: ShieldCheck, title: 'Regulatory Excellence', desc: 'Deep expertise in IFRS, GAAP, US GAAP, and local tax regulations across multiple jurisdictions' },
-            { icon: Users, title: 'Dedicated Teams', desc: 'Seasoned accountants and analysts assigned to understand your business intimately' },
-            { icon: TrendingUp, title: 'Scalable Processes', desc: 'Documented methodologies that grow with your organization' },
-            { icon: CloudCog, title: 'Cloud-First Approach', desc: 'Real-time visibility, automated workflows, and secure access from anywhere' },
-            { icon: CheckCircle2, title: 'Audit-Ready Always', desc: 'Well-maintained records that make audits stress-free experiences' },
-            { icon: Award, title: 'Industry Recognition', desc: 'Awards and recognition from professional accounting bodies across regions' },
-          ].map((item, index) => (
-            <Reveal key={item.title} delayMs={index * 50}>
-              <SurfaceCard className="h-full">
-                <div className="mb-4 inline-flex rounded-full bg-[#153585]/10 p-3 text-[#153585]">
-                  <item.icon className="h-6 w-6" />
-                </div>
-                <h3 className="text-lg font-semibold text-[#111827]">{item.title}</h3>
-                <p className="mt-2 text-sm text-slate-600">{item.desc}</p>
-              </SurfaceCard>
-            </Reveal>
-          ))}
-        </div>
-      </SectionShell>
-
-      <SectionShell tint>
-        <Reveal className="mb-8">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#153585]">Core Values</p>
-          <h2 className="mt-3 text-3xl font-semibold text-[#111827]">How We Operate</h2>
-        </Reveal>
-        <div className="grid gap-5 lg:grid-cols-[2fr_1fr]">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {[
-              { value: 'Accuracy', icon: Target },
-              { value: 'Integrity', icon: ShieldCheck },
-              { value: 'Compliance', icon: FileBarChart2 },
-              { value: 'Partnership', icon: Users },
-              { value: 'Continuous Improvement', icon: TrendingUp },
-            ].map((item) => (
-              <Reveal key={item.value}>
-                <article className="rounded-2xl border border-slate-200 bg-white p-5 text-center">
-                  <div className="mb-3 inline-flex rounded-full bg-[#153585]/10 p-2 text-[#153585]">
-                    <item.icon className="h-5 w-5" />
-                  </div>
-                  <h3 className="text-sm font-semibold text-[#111827]">{item.value}</h3>
-                </article>
-              </Reveal>
             ))}
           </div>
-          <Reveal delayMs={120}>
-            <SurfaceCard className="h-full overflow-hidden p-0">
-              <BrandImage
-                src="https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=900"
-                fallbackSrc="/img/about-framework.svg"
-                alt="Professional advisory teamwork"
-                className="h-full min-h-[280px] w-full rounded-none"
-              />
-            </SurfaceCard>
-          </Reveal>
         </div>
-      </SectionShell>
-
-      <SectionShell>
-        <Reveal className="mb-8">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#153585]">Structured 3-Step Process</p>
-          <h2 className="mt-3 text-3xl font-semibold text-[#111827]">Delivery Framework</h2>
-        </Reveal>
-        <div className="relative grid gap-5 lg:grid-cols-3">
-          <div className="pointer-events-none absolute left-[16.7%] right-[16.7%] top-16 hidden h-px bg-gradient-to-r from-[#153585]/10 via-[#153585]/45 to-[#153585]/10 lg:block" />
-          {ABOUT_PROCESS_STEPS.map((item, index) => (
-            <Reveal key={item.id} delayMs={index * 70}>
-              <SurfaceCard className="relative h-full border-[#153585]/20 bg-[linear-gradient(180deg,#ffffff,#f5f8ff)]">
-                <div className="mb-5 flex items-center justify-between">
-                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#153585] text-sm font-bold text-white">
-                    {item.step}
-                  </span>
-                  <span className="inline-flex rounded-full bg-[#153585]/10 p-2 text-[#153585]">
-                    <item.Icon className="h-5 w-5" />
-                  </span>
-                </div>
-                <h3 className="text-lg font-semibold text-[#111827]">{item.title}</h3>
-                <p className="mt-3 text-sm leading-7 text-slate-600">{item.detail}</p>
-              </SurfaceCard>
-            </Reveal>
-          ))}
-        </div>
-      </SectionShell>
-
-      <SectionShell tint>
-        <Reveal className="mb-8">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#153585]">Note from the Director</p>
-          <h2 className="mt-3 text-3xl font-semibold text-[#111827]">A Message from Our Founder</h2>
-        </Reveal>
-        <Reveal>
-          <SurfaceCard className="overflow-hidden border-[#153585]/25 bg-[linear-gradient(135deg,#0f234e,#153585_60%,#1f4aa8)] p-0 text-white">
-            <div className="grid gap-0 lg:grid-cols-[0.34fr_0.66fr]">
-              <div className="relative h-80 lg:h-full">
-                <BrandImage
-                  src="https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=1200"
-                  fallbackSrc="/img/contact-office.svg"
-                  alt="Founder portrait"
-                  className="h-full w-full rounded-none"
-                />
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#081c4f] via-[#081c4fcc] to-transparent px-5 pb-5 pt-12">
-                  <p className="text-sm font-semibold text-white">Kenneth Okwudili</p>
-                  <p className="text-xs text-blue-100">Founder & Managing Partner</p>
-                </div>
-              </div>
-              <div className="p-7 lg:p-10">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-100">
-                  Founder Perspective
-                </div>
-                <div className="mt-6 rounded-2xl border border-white/20 bg-white/10 p-5 backdrop-blur">
-                  <p className="text-lg leading-relaxed text-blue-50">
-                    "At Kiamina Accounting Services, we believe financial clarity is the foundation of every successful organization. Our conviction is simple: businesses and nonprofits deserve more than compliance; they deserve a strategic partner that turns numbers into decisive action."
-                  </p>
-                </div>
-                <div className="mt-5 space-y-4 text-sm leading-7 text-blue-100">
-                  <p>
-                    Our team combines Big 4-style rigor with deep operating knowledge of local and cross-border regulatory environments.
-                  </p>
-                  <p>
-                    Whether you are preparing investor-ready reporting, strengthening nonprofit fund controls, or scaling finance operations internationally, our mandate is to elevate your financial position with discipline and consistency.
-                  </p>
-                </div>
-                <div className="mt-6 flex flex-wrap gap-2 text-xs font-semibold">
-                  <span className="rounded-full border border-white/30 bg-white/10 px-3 py-1">Founder-led Advisory</span>
-                  <span className="rounded-full border border-white/30 bg-white/10 px-3 py-1">200+ Organizations Served</span>
-                  <span className="rounded-full border border-white/30 bg-white/10 px-3 py-1">5 Global Regions</span>
-                </div>
-              </div>
-            </div>
-          </SurfaceCard>
-        </Reveal>
-      </SectionShell>
-
-      <SectionShell tint>
-        <Reveal className="mb-8">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#153585]">Our Track Record</p>
-          <h2 className="mt-3 text-3xl font-semibold text-[#111827]">Impact by the Numbers</h2>
-        </Reveal>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {ABOUT_TRACK_RECORD.map((stat, index) => (
-            <Reveal key={stat.label} delayMs={index * 50}>
-              <SurfaceCard className="text-center">
-                <div className="mb-3 inline-flex rounded-full bg-[#153585]/10 p-2 text-[#153585]">
-                  <stat.Icon className="h-5 w-5" />
-                </div>
-                <CountUpMetric value={stat.metric} className="text-3xl font-bold text-[#153585]" />
-                <p className="mt-1 text-sm text-slate-600">{stat.label}</p>
-              </SurfaceCard>
-            </Reveal>
-          ))}
-        </div>
-      </SectionShell>
-
-      {renderNewsletterSection()}
+      </section>
     </>
   )
 
   const renderServicesPage = () => (
     <>
-      <HeroPanel pageKey="services" scrollY={scrollY}>
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <Reveal className="space-y-4 text-center lg:text-left">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-100">Services</p>
-            <h1 className="mt-3 text-4xl font-semibold text-white">Consulting-Grade Accounting Service Lines</h1>
-            <p className="mx-auto mt-4 max-w-3xl text-blue-100/90 lg:mx-0">
-              Every service is designed with executive summary clarity, concrete deliverables, and measurable strategic outcomes.
-            </p>
-          </Reveal>
-          <Reveal delayMs={120}>
-            <SurfaceCard className="p-4">
-              <BrandImage
-                src="https://unsplash.com/photos/ftCWdZOFZqo/download?force=true&w=1200"
-                fallbackSrc="/img/services-grid.svg"
-                alt="Service architecture illustration"
-                className="h-48 w-full"
-              />
-            </SurfaceCard>
-          </Reveal>
-        </div>
-      </HeroPanel>
-      <SectionShell>
+      {renderHeroSection({
+        eyebrow: 'Services',
+        title: 'Accounting, reporting, compliance, and strategic finance support designed for serious businesses.',
+        body: 'Each capability is designed to improve financial visibility, strengthen control, and support better leadership decisions.',
+        image: 'services.png',
+      })}
+      <section className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
         <div className="grid gap-8">
-          {SERVICES.map((service, idx) => (
-            <Reveal key={service.name}>
-              <article className={`rounded-2xl border transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_16px_30px_rgba(15,23,42,0.08)] ${idx % 2 === 0 ? 'bg-white border-slate-200' : 'bg-gradient-to-r from-[#153585] to-[#1a4299] border-transparent text-white'}`}>
-                <div className={`grid gap-6 ${idx % 2 === 0 ? 'md:grid-cols-[1.45fr_0.85fr]' : 'md:grid-cols-[0.85fr_1.45fr]'}`}>
-                  {idx % 2 === 0 ? (
-                    <>
-                      <div className="p-6 pb-0 md:pb-6">
-                        <div className="rounded-full bg-[#153585]/10 p-4 text-[#153585] mb-4 w-fit">
-                          <service.icon className="h-10 w-10" />
-                        </div>
-                        <h2 className="text-2xl font-semibold text-[#111827]">{service.name}</h2>
-                        <p className="mt-3 text-slate-600">{service.summary}</p>
-                        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                          <section className="rounded-xl bg-[#f3f6ff] p-4">
-                            <h3 className="text-sm font-semibold uppercase tracking-wide text-[#153585]">Key Deliverables</h3>
-                            <ul className="mt-3 space-y-2 text-sm text-slate-600">
-                              {service.deliverables.map((item) => <li key={item}>{item}</li>)}
-                            </ul>
-                          </section>
-                          <section className="rounded-xl bg-[#f8fafc] p-4">
-                            <h3 className="text-sm font-semibold uppercase tracking-wide text-[#153585]">Strategic Outcomes</h3>
-                            <ul className="mt-3 space-y-2 text-sm text-slate-600">
-                              {service.outcomes.map((item) => <li key={item}>{item}</li>)}
-                            </ul>
-                          </section>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleEngageService({
-                            eventType: 'service_click',
-                            sourcePage: 'services',
-                            targetType: 'service',
-                            sourceId: service.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-                            sourceLabel: service.name,
-                          })}
-                          className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[#153585] transition-colors hover:text-[#1f4aa8]"
-                        >
-                          Engage Service <ArrowRight className="h-4 w-4" />
-                        </button>
-                      </div>
-                      <div className="relative h-64 md:h-auto">
-                        <BrandImage
-                          src={service.image}
-                          alt={`${service.name} illustration`}
-                          className="absolute inset-0 h-full w-full object-cover rounded-b-2xl md:rounded-2xl md:rounded-l-none"
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="relative h-64 md:h-auto order-2 md:order-1">
-                        <BrandImage
-                          src={service.image}
-                          alt={`${service.name} illustration`}
-                          className="absolute inset-0 h-full w-full object-cover rounded-b-2xl md:rounded-2xl md:rounded-r-none"
-                        />
-                      </div>
-                      <div className="p-6 pb-0 md:pb-6 order-1 md:order-2">
-                        <div className="rounded-full bg-white/20 p-4 text-white mb-4 w-fit">
-                          <service.icon className="h-10 w-10" />
-                        </div>
-                        <h2 className="text-2xl font-semibold text-white">{service.name}</h2>
-                        <p className="mt-3 text-blue-100">{service.summary}</p>
-                        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                          <section className="rounded-xl bg-white/10 p-4">
-                            <h3 className="text-sm font-semibold uppercase tracking-wide text-blue-200">Key Deliverables</h3>
-                            <ul className="mt-3 space-y-2 text-sm text-blue-50">
-                              {service.deliverables.map((item) => <li key={item}>{item}</li>)}
-                            </ul>
-                          </section>
-                          <section className="rounded-xl bg-white/5 p-4">
-                            <h3 className="text-sm font-semibold uppercase tracking-wide text-blue-200">Strategic Outcomes</h3>
-                            <ul className="mt-3 space-y-2 text-sm text-blue-50">
-                              {service.outcomes.map((item) => <li key={item}>{item}</li>)}
-                            </ul>
-                          </section>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleEngageService({
-                            eventType: 'service_click',
-                            sourcePage: 'services',
-                            targetType: 'service',
-                            sourceId: service.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-                            sourceLabel: service.name,
-                          })}
-                          className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-white transition-colors hover:text-blue-200"
-                        >
-                          Engage Service <ArrowRight className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </>
-                  )}
+          {SERVICES.map((service) => (
+            <div key={service.slug} className="rounded-[2rem] border border-[#D9E3F4] bg-white p-8 shadow-sm lg:p-10">
+              <div className="grid gap-8 lg:grid-cols-[0.75fr_1.25fr]">
+                <div>
+                  <IconBadge icon={service.Icon} />
+                  <div className="text-sm font-semibold uppercase tracking-[0.24em] text-[#6491DE]">
+                    {service.title}
+                  </div>
+                  <p className="mt-4 text-lg leading-8 text-slate-600">{service.intro}</p>
                 </div>
-              </article>
-            </Reveal>
+                <div>
+                  <div className="grid gap-5 md:grid-cols-3">
+                    {[
+                      ['Problem', service.problem],
+                      ['Outcome', service.outcome],
+                      ['Best suited for', service.fit],
+                    ].map(([label, detail]) => (
+                      <div key={label} className="rounded-2xl bg-[#F1F1F1] p-5">
+                        <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">{label}</div>
+                        <p className="mt-3 text-sm leading-7 text-slate-700">{detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-6 grid gap-4 md:grid-cols-3">
+                    {service.bullets.map((bullet) => (
+                      <div key={bullet} className="rounded-2xl border border-[#D9E3F4] p-5 text-sm leading-7 text-slate-600">
+                        {bullet}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
           ))}
         </div>
-      </SectionShell>
+      </section>
     </>
   )
 
   const renderInsightsPage = () => (
     <>
-      <HeroPanel pageKey="insights" scrollY={scrollY}>
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <Reveal className="space-y-4 text-center lg:text-left">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-100">Insights</p>
-            <h1 className="mt-3 text-4xl font-semibold text-white">
-              {activeInsight ? activeInsight.title : 'Thought Leadership for Executive Teams'}
-            </h1>
-            {activeInsight && (
-              <div className="flex flex-wrap items-center gap-4 text-sm text-blue-100">
-                <span className="inline-flex items-center gap-1"><CalendarDays className="h-4 w-4" /> {formatPublishedDate(activeInsight.publishedAt)}</span>
-                <span className="inline-flex items-center gap-1"><Clock3 className="h-4 w-4" /> {activeInsight.readTime}</span>
-                <span className="inline-flex items-center gap-1"><UserCircle2 className="h-4 w-4" /> {activeInsight.author}</span>
+      {renderHeroSection({
+        eyebrow: 'Insights',
+        title: 'Financial insight for leaders, operators, and mission-driven organizations.',
+        body: 'A curated resource library covering accounting, reporting, payroll, compliance, and financial decision-making for businesses and nonprofits operating in complex environments.',
+        image: 'insights.png',
+      })}
+      <section className="border-b border-[#D9E3F4] bg-white">
+        <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
+          <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+            <button
+              type="button"
+              onClick={() => setActiveInsightSlug(INSIGHTS[0].slug)}
+              className="group rounded-[2rem] border border-[#D9E3F4] bg-[#073D7F] p-8 text-left text-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+            >
+              <div className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#6491DE]">
+                Featured Insight
               </div>
-            )}
-          </Reveal>
-          <Reveal delayMs={120}>
-            <SurfaceCard className="p-4">
-              <BrandImage
-                src={activeInsight?.cover || 'https://unsplash.com/photos/HG9M8M29Ig4/download?force=true&w=1200'}
-                fallbackSrc="/img/insights-analysis-1.svg"
-                alt="Financial analytics insights illustration"
-                className="h-48 w-full"
-              />
-            </SurfaceCard>
-          </Reveal>
-        </div>
-      </HeroPanel>
-      <SectionShell>
-        {activeInsight ? (
-          <div className="grid gap-6 lg:grid-cols-[0.75fr_0.25fr]">
-            <Reveal>
-              <SurfaceCard className="space-y-6">
+              <div className="mt-6 text-sm font-semibold uppercase tracking-[0.22em] text-blue-100">
+                {INSIGHTS[0].category}
+              </div>
+              <h2 className="mt-4 text-3xl font-semibold leading-tight tracking-tight">{INSIGHTS[0].title}</h2>
+              <p className="mt-5 max-w-2xl text-base leading-8 text-blue-100">{INSIGHTS[0].summary}</p>
+              <div className="mt-6 text-sm text-blue-200">{INSIGHTS[0].readTime}</div>
+            </button>
+            <div className="grid gap-5">
+              {INSIGHTS.slice(1).map((item) => (
                 <button
+                  key={item.slug}
                   type="button"
-                  onClick={closeInsightArticle}
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
+                  onClick={() => setActiveInsightSlug(item.slug)}
+                  className={`rounded-[1.75rem] border p-6 text-left transition duration-300 hover:-translate-y-1 hover:shadow-lg ${
+                    activeInsight.slug === item.slug
+                      ? 'border-[#073D7F] bg-[#073D7F] text-white shadow-lg'
+                      : 'border-[#D9E3F4] bg-white text-slate-900'
+                  }`}
                 >
-                  <ArrowLeft className="h-4 w-4" /> Back to Articles
+                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[#6491DE]">{item.category}</div>
+                  <h3 className="mt-3 text-xl font-semibold leading-tight">{item.title}</h3>
+                  <p className={`mt-3 text-sm leading-7 ${activeInsight.slug === item.slug ? 'text-blue-100' : 'text-slate-600'}`}>
+                    {item.summary}
+                  </p>
+                  <div className={`mt-4 text-xs ${activeInsight.slug === item.slug ? 'text-blue-200' : 'text-slate-500'}`}>
+                    {item.readTime}
+                  </div>
                 </button>
-                <p className="inline-flex rounded-full bg-[#153585]/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#153585]">
-                  {activeInsight.category}
-                </p>
-                <h2 className="text-3xl font-semibold text-[#111827]">{activeInsight.title}</h2>
-                <div className="space-y-4 text-base leading-8 text-slate-700">
-                  {activeInsight.body.map((paragraph) => (
-                    <p key={paragraph}>{paragraph}</p>
-                  ))}
-                </div>
-              </SurfaceCard>
-            </Reveal>
-            <Reveal delayMs={90}>
-              <SurfaceCard className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#153585]">Article Details</p>
-                <p className="text-sm text-slate-600"><span className="font-semibold text-slate-800">Posted:</span> {formatPublishedDate(activeInsight.publishedAt)}</p>
-                <p className="text-sm text-slate-600"><span className="font-semibold text-slate-800">Author:</span> {activeInsight.author}</p>
-                <p className="text-sm text-slate-600"><span className="font-semibold text-slate-800">Read time:</span> {activeInsight.readTime}</p>
-              </SurfaceCard>
-            </Reveal>
+              ))}
+            </div>
           </div>
-        ) : (
-          <>
-            <Reveal className="mb-6">
-              <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search articles by title, content, or category..."
-                    value={insightSearch}
-                    onChange={(e) => setInsightSearch(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-[#153585]/50 focus:ring-2 focus:ring-[#153585]/20"
-                  />
-                </div>
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <div className="relative">
-                    <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <select
-                      value={insightCategory}
-                      onChange={(e) => setInsightCategory(e.target.value)}
-                      className="rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-8 text-sm outline-none transition focus:border-[#153585]/50 focus:ring-2 focus:ring-[#153585]/20"
+        </div>
+      </section>
+      <section className="bg-[#F1F1F1]">
+        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+          <div className="grid gap-10 lg:grid-cols-[0.34fr_0.66fr] lg:items-start">
+            <aside className="space-y-6 lg:sticky lg:top-28">
+              <div className="rounded-[2rem] border border-[#D9E3F4] bg-white p-8 shadow-sm">
+                <div className="text-sm font-semibold uppercase tracking-[0.24em] text-[#6491DE]">Resource Library</div>
+                <div className="mt-6 space-y-4">
+                  {INSIGHTS.map((item) => (
+                    <button
+                      key={item.slug}
+                      type="button"
+                      onClick={() => setActiveInsightSlug(item.slug)}
+                      className={`w-full rounded-[1.25rem] border p-5 text-left transition duration-300 ${
+                        activeInsight.slug === item.slug
+                          ? 'border-[#073D7F] bg-[#073D7F] text-white shadow-md'
+                          : 'border-[#D9E3F4] bg-[#F1F1F1] text-slate-900 hover:bg-white hover:shadow-sm'
+                      }`}
                     >
-                      {insightCategories.map((cat) => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="relative">
-                    <SortAsc className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <select
-                      value={insightSort}
-                      onChange={(e) => setInsightSort(e.target.value)}
-                      className="rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-8 text-sm outline-none transition focus:border-[#153585]/50 focus:ring-2 focus:ring-[#153585]/20"
-                    >
-                      <option value="newest">Newest First</option>
-                      <option value="oldest">Oldest First</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </Reveal>
-            {filteredInsights.length === 0 ? (
-              <Reveal>
-                <SurfaceCard className="py-12 text-center">
-                  <Search className="mx-auto h-12 w-12 text-slate-300" />
-                  <h3 className="mt-4 text-lg font-semibold text-[#111827]">
-                    {insightsLoading ? 'Loading insights...' : 'No articles found'}
-                  </h3>
-                  <p className="mt-2 text-slate-600">
-                    {insightsLoading
-                      ? 'Fetching latest thought leadership updates.'
-                      : 'Try adjusting your search or filter criteria.'}
-                  </p>
-                </SurfaceCard>
-              </Reveal>
-            ) : (
-              <div className="space-y-5">
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-                  <p className="text-sm text-slate-600">
-                    Showing {(insightPage - 1) * insightsPerPage + 1}-{Math.min(insightPage * insightsPerPage, filteredInsights.length)} of {filteredInsights.length} articles
-                  </p>
-                  <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700">
-                    Articles per page
-                    <select
-                      value={insightsPerPage}
-                      onChange={(event) => setInsightsPerPage(Number(event.target.value))}
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-[#153585]/50 focus:ring-2 focus:ring-[#153585]/20"
-                    >
-                      {INSIGHTS_PER_PAGE_OPTIONS.map((option) => (
-                        <option key={`insights-page-size-${option}`} value={option}>{option}</option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <div className="grid gap-4 lg:grid-cols-3">
-                  {paginatedInsights.map((item, index) => (
-                    <Reveal key={item.slug} delayMs={(index % 3) * 60}>
-                      <article className="h-full rounded-2xl border border-slate-200 bg-white p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_32px_rgba(15,23,42,0.09)]">
-                        <BrandImage
-                          src={item.cover}
-                          fallbackSrc={`/img/insights-analysis-${(index % 3) + 1}.svg`}
-                          alt={`${item.title} illustration`}
-                          className="mb-4 h-40 w-full"
-                        />
-                        <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                          <span className="inline-flex items-center gap-1"><CalendarDays className="h-3.5 w-3.5" /> {formatPublishedDate(item.publishedAt)}</span>
-                          <span className="inline-flex items-center gap-1"><Clock3 className="h-3.5 w-3.5" /> {item.readTime}</span>
-                        </div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[#153585]">{item.category}</p>
-                        <h2 className="mt-3 text-xl font-semibold text-[#111827]">{item.title}</h2>
-                        <p className="mt-3 text-sm text-slate-600">{item.excerpt}</p>
-                        <button
-                          type="button"
-                          onClick={() => openInsightArticle(item.slug)}
-                          className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-[#153585] transition-colors hover:text-[#1f4aa8]"
-                        >
-                          Read Full Article <ArrowRight className="h-4 w-4" />
-                        </button>
-                      </article>
-                    </Reveal>
+                      <div className={`text-xs font-semibold uppercase tracking-[0.2em] ${activeInsight.slug === item.slug ? 'text-[#6491DE]' : 'text-slate-500'}`}>
+                        {item.category}
+                      </div>
+                      <div className="mt-2 text-base font-semibold leading-7">{item.title}</div>
+                      <div className={`mt-2 text-xs ${activeInsight.slug === item.slug ? 'text-blue-200' : 'text-slate-500'}`}>
+                        {item.readTime}
+                      </div>
+                    </button>
                   ))}
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                  <p className="text-sm font-medium text-slate-700">
-                    Page {insightPage} of {totalInsightPages}
-                  </p>
-                  <div className="flex items-center gap-2">
+              </div>
+              <div className="rounded-[2rem] border border-[#D9E3F4] bg-white p-8 shadow-sm">
+                <div className="text-sm font-semibold uppercase tracking-[0.24em] text-[#6491DE]">Why this matters</div>
+                <p className="mt-4 text-sm leading-7 text-slate-600">
+                  These publications help decision-makers strengthen financial control, reduce compliance risk, and improve reporting quality across businesses and nonprofits.
+                </p>
+              </div>
+            </aside>
+            <article className="overflow-hidden rounded-[2.25rem] border border-[#D9E3F4] bg-white shadow-sm">
+              <div className="border-b border-[#D9E3F4] bg-[#073D7F] px-8 py-10 text-white lg:px-10 lg:py-12">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#6491DE]">
+                    {activeInsight.category}
+                  </div>
+                  <div className="text-xs text-blue-200">{activeInsight.readTime}</div>
+                </div>
+                <h2 className="mt-5 max-w-4xl text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
+                  {activeInsight.title}
+                </h2>
+                <p className="mt-5 max-w-3xl text-lg leading-8 text-blue-100">{activeInsight.summary}</p>
+              </div>
+              <div className="grid gap-10 px-8 py-10 lg:grid-cols-[0.24fr_0.76fr] lg:px-10 lg:py-12">
+                <div className="space-y-8">
+                  {[
+                    ['Publication focus', 'Practical guidance for financial operations, compliance discipline, and management decision-making.'],
+                    ['Audience', 'Founders, executives, finance leads, administrators, and nonprofit decision-makers.'],
+                    ['Use', 'Use this insight to strengthen internal finance processes and reduce operational risk.'],
+                  ].map(([label, detail]) => (
+                    <div key={label}>
+                      <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">{label}</div>
+                      <div className="mt-3 text-sm leading-7 text-slate-700">{detail}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-10">
+                  {activeInsight.sections.map((section, index) => (
+                    <section key={section.heading} className="border-b border-slate-100 pb-10 last:border-b-0 last:pb-0">
+                      <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[#6491DE]">Section {index + 1}</div>
+                      <h3 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">{section.heading}</h3>
+                      {section.body ? <p className="mt-4 text-base leading-8 text-slate-600">{section.body}</p> : null}
+                      {section.bullets ? (
+                        <ul className="mt-5 space-y-4 text-base leading-8 text-slate-600">
+                          {section.bullets.map((bullet) => (
+                            <li key={bullet} className="flex gap-4">
+                              <span className="mt-3 h-1.5 w-1.5 shrink-0 rounded-full bg-[#6491DE]" />
+                              <span>{bullet}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </section>
+                  ))}
+                  <div className="rounded-[1.75rem] bg-[#073D7F] p-8 text-white">
+                    <div className="text-sm font-semibold uppercase tracking-[0.24em] text-[#6491DE]">Take Action</div>
+                    <p className="mt-4 text-base leading-8 text-blue-100">{activeInsight.cta}</p>
                     <button
                       type="button"
-                      onClick={() => setInsightPage((prev) => Math.max(1, prev - 1))}
-                      disabled={insightPage <= 1}
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50 hover:bg-slate-100"
+                      onClick={() => handleNavigate('contact')}
+                      className="mt-6 inline-flex items-center rounded-full bg-[#6491DE] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#4F7FD1]"
                     >
-                      Previous
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setInsightPage((prev) => Math.min(totalInsightPages, prev + 1))}
-                      disabled={insightPage >= totalInsightPages}
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 transition disabled:cursor-not-allowed disabled:opacity-50 hover:bg-slate-100"
-                    >
-                      Next
+                      Book a Free Consultation
                     </button>
                   </div>
                 </div>
               </div>
-            )}
-          </>
-        )}
-      </SectionShell>
+            </article>
+          </div>
+        </div>
+      </section>
     </>
   )
 
   const renderCareersPage = () => (
     <>
-      <HeroPanel pageKey="careers" scrollY={scrollY}>
-        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <Reveal className="space-y-5 text-center lg:text-left">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-100">Careers</p>
-            <h1 className="mt-3 text-4xl font-semibold text-white">Build a Career with High Professional Standards</h1>
-            <p className="mx-auto max-w-3xl text-blue-100/90 lg:mx-0">
-              Join a team where accounting discipline, compliance rigor, and strategic thinking define everyday delivery.
+      {renderHeroSection({
+        eyebrow: 'Career',
+        title: 'Build your career with a firm focused on precision, integrity, and growth.',
+        body: 'We are building a high-standard accounting and advisory practice designed to support businesses and nonprofits with clarity, compliance, and strategic financial insight.',
+        image: 'career.png',
+      })}
+      <section className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+        <img
+          src={`${WEBSITE_ASSET_BASE}/career.png`}
+          alt="Career opportunities at Kiamina"
+          className="mb-10 h-[320px] w-full rounded-[2rem] object-cover"
+        />
+        <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="rounded-[2rem] border border-[#D9E3F4] bg-white p-8 shadow-sm">
+            <IconBadge icon={Users} />
+            <div className="text-sm font-semibold uppercase tracking-[0.24em] text-[#6491DE]">Why Join Kiamina</div>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">
+              A growing environment for professionals who value excellence.
+            </h2>
+            <p className="mt-5 text-base leading-8 text-slate-600">
+              At Kiamina Accounting Services, we believe strong careers are built on technical excellence, continuous improvement, and meaningful client impact.
             </p>
-            <a href="mailto:recruitment@kiaminaaccounting.com" className="inline-flex items-center justify-center rounded-full border border-white/40 bg-white/10 px-6 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/20">
-              Send Application
-            </a>
-          </Reveal>
-          <Reveal delayMs={120}>
-            <SurfaceCard className="p-4">
-              <BrandImage
-                src="https://unsplash.com/photos/vzfgh3RAPzM/download?force=true&w=1200"
-                fallbackSrc="/img/careers-team.svg"
-                alt="Professional team collaboration illustration"
-                className="h-48 w-full"
-              />
-            </SurfaceCard>
-          </Reveal>
-        </div>
-      </HeroPanel>
-      <SectionShell>
-        <div className="grid gap-5 lg:grid-cols-[1fr_1fr]">
-          <Reveal>
-            <SurfaceCard className="h-full overflow-hidden p-0">
-              <BrandImage
-                src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1400"
-                fallbackSrc="/img/careers-team.svg"
-                alt="Career collaboration environment"
-                className="h-full min-h-[340px] w-full rounded-none"
-              />
-            </SurfaceCard>
-          </Reveal>
-          <Reveal delayMs={80}>
-            <SurfaceCard className="h-full">
-              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#153585]">Why Join Kiamina</p>
-              <h2 className="mt-3 text-3xl font-semibold text-[#111827]">Build Deep Advisory Capability</h2>
-              <p className="mt-4 text-sm leading-7 text-slate-600">
-                We provide an environment for accountants and finance professionals to work on real compliance and advisory challenges across multiple regions and industries.
-              </p>
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <p className="rounded-xl border border-[#153585]/15 bg-[#f6f8ff] px-3 py-2 text-sm font-semibold text-[#153585]">Cross-Border Exposure</p>
-                <p className="rounded-xl border border-[#153585]/15 bg-[#f6f8ff] px-3 py-2 text-sm font-semibold text-[#153585]">Mentored Growth Path</p>
-                <p className="rounded-xl border border-[#153585]/15 bg-[#f6f8ff] px-3 py-2 text-sm font-semibold text-[#153585]">Structured Delivery Culture</p>
-                <p className="rounded-xl border border-[#153585]/15 bg-[#f6f8ff] px-3 py-2 text-sm font-semibold text-[#153585]">Impact-Focused Work</p>
-              </div>
-            </SurfaceCard>
-          </Reveal>
-        </div>
-      </SectionShell>
-
-      <SectionShell tint>
-        <Reveal className="mb-8">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#153585]">What We Value</p>
-          <h2 className="mt-3 text-3xl font-semibold text-[#111827]">Culture Anchors</h2>
-        </Reveal>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          {[
-            { title: 'Accuracy', icon: Target },
-            { title: 'Integrity', icon: ShieldCheck },
-            { title: 'Compliance', icon: FileBarChart2 },
-            { title: 'Partnership', icon: Users },
-            { title: 'Continuous Improvement', icon: TrendingUp },
-          ].map((item, index) => (
-            <Reveal key={item.title} delayMs={index * 45}>
-              <SurfaceCard className="h-full text-center">
-                <div className="mb-3 inline-flex rounded-full bg-[#153585]/10 p-2 text-[#153585]">
-                  <item.icon className="h-5 w-5" />
+            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+              {[
+                'Exposure to real client challenges',
+                'Professional and ethical work culture',
+                'Growth-oriented environment',
+                'Opportunities to build specialist expertise',
+              ].map((item) => (
+                <div key={item} className="rounded-[1.25rem] border border-[#D9E3F4] bg-[#F1F1F1] p-4 text-sm leading-7 text-slate-700">
+                  {item}
                 </div>
-                <h3 className="text-sm font-semibold text-[#111827]">{item.title}</h3>
-              </SurfaceCard>
-            </Reveal>
-          ))}
-        </div>
-      </SectionShell>
-
-      <SectionShell>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Reveal>
-            <SurfaceCard className="h-full">
-              <h2 className="text-2xl font-semibold text-[#111827]">Hiring Criteria</h2>
-              <ul className="mt-4 space-y-2 text-slate-600">
-                <li>Technical competence in accounting and reporting</li>
-                <li>Strong ethics and professional judgment</li>
-                <li>Attention to detail and documentation quality</li>
-                <li>Willingness to learn and adapt quickly</li>
-              </ul>
-            </SurfaceCard>
-          </Reveal>
-          <Reveal delayMs={70}>
-            <SurfaceCard className="h-full border-[#153585]/20 bg-[linear-gradient(170deg,#f5f8ff,#ffffff)]">
-              <h2 className="text-2xl font-semibold text-[#111827]">Apply</h2>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-[2rem] border border-[#D9E3F4] bg-[#F1F1F1] p-8 shadow-sm">
+            <IconBadge icon={Briefcase} />
+            <div className="text-sm font-semibold uppercase tracking-[0.24em] text-[#6491DE]">Current Openings</div>
+            <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">No vacancies at the moment.</h2>
+            <p className="mt-5 text-base leading-8 text-slate-600">
+              We do not have any active openings right now. When opportunities become available, they will be published here with full role details and application instructions.
+            </p>
+            <div className="mt-8 rounded-[1.5rem] border border-dashed border-[#D9E3F4] bg-white p-8">
+              <div className="text-lg font-semibold text-slate-950">Please check back later.</div>
               <p className="mt-3 text-sm leading-7 text-slate-600">
-                Send your CV and a short note describing your experience and service area interests.
+                You can also follow Kiamina Accounting Services for future announcements and career updates.
               </p>
-              <a
-                href="mailto:recruitment@kiaminaaccounting.com"
-                className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#153585] px-5 py-3 text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#1f4aa8]"
-              >
-                recruitment@kiaminaaccounting.com <ArrowRight className="h-4 w-4" />
-              </a>
-            </SurfaceCard>
-          </Reveal>
+            </div>
+          </div>
         </div>
-      </SectionShell>
+      </section>
     </>
   )
 
   const renderContactPage = () => (
     <>
-      <HeroPanel pageKey="contact" scrollY={scrollY}>
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <Reveal className="space-y-4 text-center lg:text-left">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-100">Contact</p>
-            <h1 className="mt-3 text-4xl font-semibold text-white">Connect with Kiamina Advisory Team</h1>
-          </Reveal>
-          <Reveal delayMs={120}>
-            <SurfaceCard className="p-4">
-              <BrandImage
-                src="https://unsplash.com/photos/n95VMLxqM2I/download?force=true&w=1200"
-                fallbackSrc="/img/contact-office.svg"
-                alt="Corporate office contact illustration"
-                className="h-48 w-full"
-              />
-            </SurfaceCard>
-          </Reveal>
-        </div>
-      </HeroPanel>
-      <SectionShell>
-        <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
-          <Reveal>
-            <SurfaceCard>
-              <h2 className="text-2xl font-semibold text-[#111827]">Contact Form</h2>
-              <form onSubmit={submitContact} className="mt-5 grid gap-4">
-                <label className="text-sm font-semibold text-slate-700">
-                  Name
-                  <input
-                    className={`mt-1.5 w-full rounded-xl border px-4 py-2.5 outline-none transition focus:ring-2 ${
-                      contactErrors.name
-                        ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
-                        : 'border-slate-300 focus:border-[#153585]/50 focus:ring-[#153585]/20'
-                    }`}
-                    value={contactForm.name}
-                    onChange={(event) => {
-                      setContactSubmitted(false)
-                      clearContactError('name')
-                      setContactForm((prev) => ({ ...prev, name: event.target.value }))
-                    }}
-                    required
-                    aria-invalid={Boolean(contactErrors.name)}
-                  />
-                  {contactErrors.name && <p className="mt-1 text-xs font-medium text-red-600">{contactErrors.name}</p>}
-                </label>
-                <label className="text-sm font-semibold text-slate-700">
-                  Email
-                  <input
-                    type="email"
-                    className={`mt-1.5 w-full rounded-xl border px-4 py-2.5 outline-none transition focus:ring-2 ${
-                      contactErrors.email
-                        ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
-                        : 'border-slate-300 focus:border-[#153585]/50 focus:ring-[#153585]/20'
-                    }`}
-                    value={contactForm.email}
-                    onChange={(event) => {
-                      setContactSubmitted(false)
-                      clearContactError('email')
-                      setContactForm((prev) => ({ ...prev, email: event.target.value }))
-                    }}
-                    required
-                    aria-invalid={Boolean(contactErrors.email)}
-                  />
-                  {contactErrors.email && <p className="mt-1 text-xs font-medium text-red-600">{contactErrors.email}</p>}
-                </label>
-                <label className="text-sm font-semibold text-slate-700">
-                  Country
-                  <select
-                    className={`mt-1.5 w-full rounded-xl border bg-white px-4 py-2.5 outline-none transition focus:ring-2 ${
-                      contactErrors.country
-                        ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
-                        : 'border-slate-300 focus:border-[#153585]/50 focus:ring-[#153585]/20'
-                    }`}
-                    value={contactForm.country}
-                    onChange={(event) => {
-                      setContactSubmitted(false)
-                      clearContactError('country')
-                      setContactForm((prev) => ({ ...prev, country: event.target.value }))
-                    }}
-                    required
-                    aria-invalid={Boolean(contactErrors.country)}
-                  >
-                    <option value="">Select country</option>
-                    {REGION_ITEMS.map((region) => (
-                      <option key={`contact-country-${region.id}`} value={region.label}>
-                        {region.label}
-                      </option>
-                    ))}
-                  </select>
-                  {contactErrors.country && <p className="mt-1 text-xs font-medium text-red-600">{contactErrors.country}</p>}
-                </label>
-                <label className="text-sm font-semibold text-slate-700">
-                  Service Needed
-                  <input
-                    className={`mt-1.5 w-full rounded-xl border px-4 py-2.5 outline-none transition focus:ring-2 ${
-                      contactErrors.service
-                        ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
-                        : 'border-slate-300 focus:border-[#153585]/50 focus:ring-[#153585]/20'
-                    }`}
-                    value={contactForm.service}
-                    onChange={(event) => {
-                      setContactSubmitted(false)
-                      clearContactError('service')
-                      setContactForm((prev) => ({ ...prev, service: event.target.value }))
-                    }}
-                    required
-                    aria-invalid={Boolean(contactErrors.service)}
-                  />
-                  {contactErrors.service && <p className="mt-1 text-xs font-medium text-red-600">{contactErrors.service}</p>}
-                </label>
-                <label className="text-sm font-semibold text-slate-700">
-                  Message
-                  <textarea
-                    className={`mt-1.5 min-h-[140px] w-full rounded-xl border px-4 py-2.5 outline-none transition focus:ring-2 ${
-                      contactErrors.message
-                        ? 'border-red-400 focus:border-red-400 focus:ring-red-100'
-                        : 'border-slate-300 focus:border-[#153585]/50 focus:ring-[#153585]/20'
-                    }`}
-                    value={contactForm.message}
-                    onChange={(event) => {
-                      setContactSubmitted(false)
-                      clearContactError('message')
-                      setContactForm((prev) => ({ ...prev, message: event.target.value }))
-                    }}
-                    required
-                    aria-invalid={Boolean(contactErrors.message)}
-                  />
-                  {contactErrors.message && <p className="mt-1 text-xs font-medium text-red-600">{contactErrors.message}</p>}
-                </label>
-                <button type="submit" className={primaryButtonClass}>Submit Request</button>
-                {contactSubmitted && (
-                  <p className="text-sm font-semibold text-green-700">
-                    Thank you. We have received your request and our team will reach out.
-                  </p>
-                )}
-              </form>
-            </SurfaceCard>
-          </Reveal>
-          <Reveal>
-            <div className="space-y-5">
-              <SurfaceCard className="space-y-5 overflow-hidden bg-[linear-gradient(180deg,#ffffff,#f4f8ff)]">
-                <h2 className="text-2xl font-semibold text-[#111827]">Nigerian Head Office</h2>
-                <div id="nigeria" className="flex items-start gap-2 text-sm text-slate-600">
-                  <MapPin className="mt-0.5 h-4 w-4 text-[#153585]" />
-                  <p><span className="font-semibold text-slate-800">Address:</span> 10 Akpunonu Street, Port Harcourt, Rivers State, Nigeria, 500102</p>
-                </div>
-                <div className="flex items-start gap-2 text-sm text-slate-600">
-                  <Phone className="mt-0.5 h-4 w-4 text-[#153585]" />
-                  <p><span className="font-semibold text-slate-800">Phone:</span> +234 906 496 2073</p>
-                </div>
-                <div className="flex items-start gap-2 text-sm text-slate-600">
-                  <Mail className="mt-0.5 h-4 w-4 text-[#153585]" />
-                  <p><span className="font-semibold text-slate-800">Email:</span> info@kiaminaaccounting.com</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleEngageService({
-                    sourcePage: 'contact',
-                    sourceId: 'book-consultation',
-                    sourceLabel: 'Book Consultation',
-                  })}
-                  className={secondaryButtonClass}
-                >
-                  Book Consultation
-                </button>
-                <a
-                  href={CALENDAR_BOOKING_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={() => trackWebsiteEvent({
-                    eventType: 'cta_click',
-                    page: 'contact',
-                    targetType: 'cta',
-                    targetId: 'contact-schedule-call',
-                    targetLabel: 'Contact Schedule a Call',
-                  })}
-                  className={secondaryButtonClass}
-                >
-                  Schedule a Call
-                </a>
-                <div className="overflow-hidden rounded-2xl border border-[#153585]/20 shadow-[0_10px_24px_rgba(21,53,133,0.12)]">
-                  <iframe
-                    src={CONTACT_MAP_EMBED_SRC}
-                    title="Kiamina Accounting Services office map"
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                    className="h-64 w-full"
-                  />
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs font-semibold text-[#153585]">
-                  <a className="rounded-full border border-[#153585]/25 px-3 py-1.5 hover:bg-[#153585]/5" href="https://www.google.com/maps/search/?api=1&query=10+Akpunonu+Street,+Port+Harcourt,+Rivers+State,+Nigeria,+500102" target="_blank" rel="noreferrer">Open Full Map</a>
-                  <a className="rounded-full border border-[#153585]/25 px-3 py-1.5 hover:bg-[#153585]/5" href="https://www.linkedin.com" target="_blank" rel="noreferrer">LinkedIn</a>
-                  <a className="rounded-full border border-[#153585]/25 px-3 py-1.5 hover:bg-[#153585]/5" href="https://x.com" target="_blank" rel="noreferrer">X</a>
-                  <a className="rounded-full border border-[#153585]/25 px-3 py-1.5 hover:bg-[#153585]/5" href="https://www.instagram.com" target="_blank" rel="noreferrer">Instagram</a>
-                  <a className="rounded-full border border-[#153585]/25 px-3 py-1.5 hover:bg-[#153585]/5" href="https://www.facebook.com" target="_blank" rel="noreferrer">Facebook</a>
-                </div>
-              </SurfaceCard>
-
-              <SurfaceCard className="border-[#0f234e]/20 bg-[linear-gradient(140deg,#0d2153,#153585_60%,#1f4aa8)] text-white shadow-[0_20px_36px_rgba(8,28,79,0.35)]">
-                <p className="text-xs font-bold uppercase tracking-[0.12em] text-blue-200">Direct Support Channels</p>
-                <p className="mt-2 text-sm text-blue-50">Reach our advisory desk directly for onboarding, service scoping, or urgent compliance support.</p>
-                <div className="mt-4 grid gap-3">
-                  <a
-                    href="tel:+2349064962073"
-                    className="inline-flex items-center justify-between rounded-xl border border-white/35 bg-white/15 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/25"
-                  >
-                    <span className="inline-flex items-center gap-2"><Phone className="h-4 w-4" /> Call Advisory Desk</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </a>
-                  <a
-                    href={CALENDAR_BOOKING_URL}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={() => trackWebsiteEvent({
-                      eventType: 'cta_click',
-                      page: 'contact',
-                      targetType: 'cta',
-                      targetId: 'direct-support-schedule-call',
-                      targetLabel: 'Direct Support Schedule a Call',
-                    })}
-                    className="inline-flex items-center justify-between rounded-xl border border-white/35 bg-white/15 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/25"
-                  >
-                    <span className="inline-flex items-center gap-2"><CalendarDays className="h-4 w-4" /> Schedule a Call</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </a>
-                  <a
-                    href="mailto:info@kiaminaaccounting.com?subject=Service%20Engagement%20Request"
-                    className="inline-flex items-center justify-between rounded-xl border border-white/35 bg-white/15 px-4 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/25"
-                  >
-                    <span className="inline-flex items-center gap-2"><Mail className="h-4 w-4" /> Send Engagement Email</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </a>
-                </div>
-                <p className="mt-4 text-xs font-medium text-blue-100">Typical response time for inbound inquiries: within 1 business day.</p>
-              </SurfaceCard>
+      {renderHeroSection({
+        eyebrow: 'Contact',
+        title: 'Start with a focused consultation built around your reporting, control, and growth priorities.',
+        body: 'For founders, CEOs, CFOs, and decision-makers looking for serious accounting and advisory support, the next step is a structured conversation.',
+        image: 'contact.png',
+      })}
+      <section className="mx-auto grid max-w-7xl gap-10 px-6 py-20 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
+        <div className="space-y-8">
+          <div className="rounded-[2rem] border border-[#D9E3F4] bg-white p-8 shadow-sm">
+            <div className="text-sm font-semibold uppercase tracking-[0.24em] text-[#6491DE]">Contact details</div>
+            <div className="mt-6 space-y-5 text-sm leading-7 text-slate-600">
+              <p><span className="font-semibold text-slate-900">Email:</span> info@kiaminaaccounting.com</p>
+              <p><span className="font-semibold text-slate-900">Phone:</span> +234 906 496 2073</p>
+              <p><span className="font-semibold text-slate-900">Head office:</span> 10 Akpunonu Street, Rumuodumaya, Port Harcourt, Rivers, Nigeria, 500102</p>
+              <p><span className="font-semibold text-slate-900">Active markets:</span> Nigeria, Canada, United States, United Kingdom, Australia, and Ireland</p>
             </div>
-          </Reveal>
+            <div className="mt-8">
+              <div className="text-sm font-semibold uppercase tracking-[0.20em] text-[#073D7F]">Follow us</div>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                {SOCIAL_LINKS.map((social) => <SocialBadge key={social.name} href={social.href} name={social.name} />)}
+              </div>
+              <div className="mt-2 text-xs text-slate-500">Stay connected for insights and updates</div>
+            </div>
+          </div>
+          <div className="rounded-[2rem] border border-[#D9E3F4] bg-white p-8 shadow-sm">
+            <div className="text-sm font-semibold uppercase tracking-[0.24em] text-[#6491DE]">Send a message</div>
+            <h2 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">Tell us what you need help with.</h2>
+            <p className="mt-4 text-sm leading-7 text-slate-600">
+              Complete the form below and our team will respond with the next step for your accounting, reporting, payroll, tax, or advisory needs.
+            </p>
+            <form onSubmit={submitContact} className="mt-6 space-y-4">
+              <input
+                type="text"
+                value={contactForm.name}
+                onChange={(event) => setContactForm((prev) => ({ ...prev, name: event.target.value }))}
+                placeholder="Full name"
+                className="w-full rounded-xl border border-[#D9E3F4] bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#073D7F]"
+                required
+              />
+              <input
+                type="email"
+                value={contactForm.email}
+                onChange={(event) => setContactForm((prev) => ({ ...prev, email: event.target.value }))}
+                placeholder="Email address"
+                className="w-full rounded-xl border border-[#D9E3F4] bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#073D7F]"
+                required
+              />
+              <input
+                type="text"
+                value={contactForm.company}
+                onChange={(event) => setContactForm((prev) => ({ ...prev, company: event.target.value }))}
+                placeholder="Company / Organization"
+                className="w-full rounded-xl border border-[#D9E3F4] bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#073D7F]"
+              />
+              <select
+                value={contactForm.service}
+                onChange={(event) => setContactForm((prev) => ({ ...prev, service: event.target.value }))}
+                className="w-full rounded-xl border border-[#D9E3F4] bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#073D7F]"
+              >
+                <option value="">Select a service</option>
+                {SERVICES.map((service) => (
+                  <option key={service.slug} value={service.title}>{service.title}</option>
+                ))}
+              </select>
+              <textarea
+                value={contactForm.message}
+                onChange={(event) => setContactForm((prev) => ({ ...prev, message: event.target.value }))}
+                rows={5}
+                placeholder="Tell us about your needs"
+                className="w-full rounded-xl border border-[#D9E3F4] bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#073D7F]"
+                required
+              />
+              <button
+                type="submit"
+                disabled={contactStatus === 'loading'}
+                className="inline-flex items-center rounded-full bg-[#073D7F] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {contactStatus === 'loading' ? 'Sending...' : 'Send Message'}
+              </button>
+              {contactMessage ? (
+                <div className={`rounded-xl px-4 py-3 text-sm leading-7 ${contactStatus === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                  {contactMessage}
+                </div>
+              ) : null}
+            </form>
+          </div>
+          <div className="rounded-[2rem] border border-[#D9E3F4] bg-[#F1F1F1] p-8 shadow-sm">
+            <div className="text-sm font-semibold uppercase tracking-[0.24em] text-[#6491DE]">Subscribe for insights</div>
+            <h2 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">
+              Receive accounting, compliance, payroll, and reporting insights by email.
+            </h2>
+            <form onSubmit={submitNewsletter} className="mt-6 space-y-4">
+              <input
+                type="text"
+                value={newsletterForm.fullName}
+                onChange={(event) => setNewsletterForm((prev) => ({ ...prev, fullName: event.target.value }))}
+                placeholder="Full name"
+                className="w-full rounded-xl border border-[#D9E3F4] bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#073D7F]"
+              />
+              <input
+                type="email"
+                value={newsletterForm.email}
+                onChange={(event) => setNewsletterForm((prev) => ({ ...prev, email: event.target.value }))}
+                placeholder="Email address"
+                className="w-full rounded-xl border border-[#D9E3F4] bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-[#073D7F]"
+              />
+              <button type="submit" disabled={newsletterStatus === 'loading'} className="inline-flex items-center rounded-full bg-[#073D7F] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70">
+                {newsletterStatus === 'loading' ? 'Connecting...' : 'Subscribe'}
+              </button>
+              {newsletterMessage ? (
+                <div className={`rounded-xl px-4 py-3 text-sm leading-7 ${newsletterStatus === 'success' ? 'bg-emerald-50 text-emerald-700' : newsletterStatus === 'error' ? 'bg-red-50 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
+                  {newsletterMessage}
+                </div>
+              ) : null}
+            </form>
+          </div>
         </div>
-      </SectionShell>
-      <SectionShell>
-        <Reveal className="mb-8">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#153585]">Response Framework</p>
-          <h2 className="mt-3 text-3xl font-semibold text-[#111827]">What Happens After You Contact Us</h2>
-        </Reveal>
-        <div className="grid gap-4 md:grid-cols-3">
-          <Reveal>
-            <SurfaceCard className="h-full">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#153585]">01</p>
-              <h3 className="mt-3 text-lg font-semibold text-[#111827]">Initial Advisory Triage</h3>
-              <p className="mt-3 text-sm text-slate-600">Your request is reviewed and routed to the relevant accounting or tax specialist.</p>
-            </SurfaceCard>
-          </Reveal>
-          <Reveal delayMs={60}>
-            <SurfaceCard className="h-full">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#153585]">02</p>
-              <h3 className="mt-3 text-lg font-semibold text-[#111827]">Service Scoping Call</h3>
-              <p className="mt-3 text-sm text-slate-600">A structured discovery call confirms timelines, deliverables, and compliance priorities.</p>
-            </SurfaceCard>
-          </Reveal>
-          <Reveal delayMs={120}>
-            <SurfaceCard className="h-full">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#153585]">03</p>
-              <h3 className="mt-3 text-lg font-semibold text-[#111827]">Engagement Launch</h3>
-              <p className="mt-3 text-sm text-slate-600">We initiate onboarding and begin service delivery with clear reporting cadence and ownership.</p>
-            </SurfaceCard>
-          </Reveal>
+        <div id={CONTACT_CONSULTATION_CALENDAR_ID} className="scroll-mt-48 rounded-[2rem] bg-white p-5 shadow-xl ring-1 ring-[#D9E3F4] lg:sticky lg:top-28">
+          <div className="mb-6 rounded-2xl border border-[#D9E3F4] bg-[#F1F1F1] p-5">
+            <div className="text-sm font-semibold text-[#073D7F]">What happens after booking:</div>
+            <ul className="mt-3 space-y-2 text-sm text-slate-600">
+              <li>Review of your current accounting and reporting setup</li>
+              <li>Identification of gaps and risks</li>
+              <li>Clear recommendation on next steps</li>
+            </ul>
+          </div>
+          <div className="overflow-hidden rounded-[1.5rem] border border-[#D9E3F4] bg-[#F1F1F1]">
+            <iframe
+              src={CALENDAR_BOOKING_URL}
+              title="Book a consultation with Kiamina Accounting Services"
+              className="h-[640px] w-full"
+            />
+          </div>
         </div>
-      </SectionShell>
-      <SectionShell tint>
-        <Reveal className="mb-8">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#153585]">Regional Coverage</p>
-          <h2 className="mt-3 text-3xl font-semibold text-[#111827]">Client Presence Across Strategic Markets</h2>
-        </Reveal>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          {REGION_ITEMS.map((item, index) => (
-            <Reveal key={item.id} delayMs={(index % 5) * 40}>
-              <article id={item.id} className="rounded-2xl border border-slate-200 bg-white p-4 text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_32px_rgba(15,23,42,0.09)]">
-                <BrandImage
-                  src={item.flag}
-                  alt={`${item.label} flag`}
-                  className="mx-auto mb-3 h-14 w-20 border border-slate-200"
-                />
-                <h3 className="text-sm font-semibold text-[#111827]">{item.label}</h3>
-              </article>
-            </Reveal>
-          ))}
-        </div>
-      </SectionShell>
-
-      {renderNewsletterSection()}
+      </section>
     </>
+  )
+
+  const renderFooter = () => (
+    <footer className="border-t border-[#D9E3F4] bg-white">
+      <div className="mx-auto grid max-w-7xl gap-8 px-6 py-12 lg:grid-cols-[1fr_auto] lg:px-8">
+        <div>
+          <div className="text-sm font-semibold uppercase tracking-[0.24em] text-[#073D7F]">
+            Kiamina Accounting Services
+          </div>
+          <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600">
+            Nigeria-based accounting and advisory firm providing structured financial operations, reporting clarity, and strategic support to clients across Nigeria, Canada, United States, United Kingdom, Australia, and Ireland.
+          </p>
+          <div className="mt-6">
+            <div className="text-sm font-semibold uppercase tracking-[0.20em] text-[#073D7F]">Follow us</div>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              {SOCIAL_LINKS.map((social) => <SocialBadge key={social.name} href={social.href} name={social.name} />)}
+            </div>
+            <div className="mt-2 text-xs text-slate-500">Stay connected for insights and updates</div>
+          </div>
+        </div>
+        <div className="space-y-3 text-sm text-slate-600">
+          <div className="flex items-start gap-3">
+            <Mail className="mt-1 h-4 w-4 text-[#6491DE]" />
+            <span>info@kiaminaaccounting.com</span>
+          </div>
+          <div className="flex items-start gap-3">
+            <Phone className="mt-1 h-4 w-4 text-[#6491DE]" />
+            <span>+234 906 496 2073</span>
+          </div>
+          <div className="flex items-start gap-3">
+            <MapPin className="mt-1 h-4 w-4 text-[#6491DE]" />
+            <span>10 Akpunonu Street, Rumuodumaya, Port Harcourt, Rivers, Nigeria, 500102</span>
+          </div>
+          <div className="flex items-start gap-3">
+            <Clock3 className="mt-1 h-4 w-4 text-[#6491DE]" />
+            <span>Mon - Fri, 8:00 AM - 5:00 PM (WAT)</span>
+          </div>
+        </div>
+      </div>
+      <div className="border-t border-[#D9E3F4]">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-5 text-xs text-slate-500 lg:px-8">
+          <p>&copy; {new Date().getFullYear()} Kiamina Accounting Services. All rights reserved.</p>
+          <div className="flex flex-wrap items-center gap-4">
+            <button type="button" onClick={() => handleNavigate('about')} className="text-[#073D7F] transition hover:text-[#6491DE]">About</button>
+            <button type="button" onClick={() => handleNavigate('services')} className="text-[#073D7F] transition hover:text-[#6491DE]">Services</button>
+            <button type="button" onClick={() => handleNavigate('insights')} className="text-[#073D7F] transition hover:text-[#6491DE]">Insights</button>
+            <button type="button" onClick={() => handleNavigate('contact')} className="text-[#073D7F] transition hover:text-[#6491DE]">Contact</button>
+            <button type="button" onClick={onOpenAdminPortal} className="rounded-full border border-[#D9E3F4] px-3 py-1.5 font-semibold text-[#073D7F] hover:bg-[#F1F1F1]">
+              Admin Portal
+            </button>
+          </div>
+        </div>
+      </div>
+    </footer>
   )
 
   const pageRenderer = {
@@ -2470,17 +2030,7 @@ function PreliminaryCorporateSite({
   const renderPage = pageRenderer[resolvedPage] || renderHomePage
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <style>{`
-        @keyframes preliminaryIndustryCarousel {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        @keyframes preliminarySoftwareCarousel {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-      `}</style>
+    <div className="min-h-screen bg-white text-slate-900">
       <header
         className={`sticky top-0 z-40 border-b backdrop-blur transition-colors duration-200 ${
           isHeaderCompact
@@ -2490,8 +2040,7 @@ function PreliminaryCorporateSite({
       >
         <div className={`mx-auto flex w-[min(1160px,92vw)] items-center justify-between gap-3 transition-all duration-200 ${isHeaderCompact ? 'py-3' : 'py-5'}`}>
           <button type="button" onClick={() => handleNavigate('home')} className="inline-flex items-center gap-3 text-left">
-            <KiaminaLogo className="h-10 w-auto" />
-            <span className="text-sm font-bold text-[#111827]">Kiamina Accounting Services</span>
+            <KiaminaLogo className="h-28 w-auto" />
           </button>
 
           <nav className="hidden xl:block">
@@ -2515,10 +2064,26 @@ function PreliminaryCorporateSite({
                 <button
                   type="button"
                   onClick={() => setRegionsOpen((prev) => !prev)}
+                  aria-label={getLocationDetectionAriaLabel({
+                    isResolved: isRegionResolved,
+                    regionLabel: selectedRegion.label,
+                  })}
                   className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-100 hover:text-[#153585]"
                 >
-                  <BrandImage src={selectedRegion.flag} alt={`${selectedRegion.label} flag`} className="h-4 w-6 rounded-sm border border-slate-200" />
-                  <span>{isRegionResolved ? selectedRegion.label : 'Detecting region...'}</span>
+                  <BrandImage
+                    src={selectedRegion.flag}
+                    alt={getRegionFlagAlt({
+                      isResolved: isRegionResolved,
+                      regionLabel: selectedRegion.label,
+                    })}
+                    className="h-4 w-6 rounded-sm border border-slate-200"
+                  />
+                  <span>
+                    {getLocationDetectionLabel({
+                      isResolved: isRegionResolved,
+                      regionLabel: selectedRegion.label,
+                    })}
+                  </span>
                   <ChevronDown className="h-4 w-4" />
                 </button>
                 {regionsOpen && (
@@ -2528,14 +2093,16 @@ function PreliminaryCorporateSite({
                         key={item.id}
                         type="button"
                         onClick={() => {
+                          manualRegionSelectionRef.current = true
                           setSelectedRegionId(item.id)
-                          setContactForm((prev) => ({ ...prev, country: item.label }))
+                          setIsRegionResolved(true)
                           trackWebsiteEvent({
                             eventType: 'region_select',
                             page: resolvedPage,
                             targetType: 'region',
                             targetId: item.id,
                             targetLabel: item.label,
+                            metadata: getManualRegionSelectionMetadata(item),
                           })
                           setRegionsOpen(false)
                           handleNavigate('contact')
@@ -2558,7 +2125,10 @@ function PreliminaryCorporateSite({
 
           <div className="hidden items-center gap-2 xl:flex">
             {isAuthenticated ? (
-              <button type="button" onClick={onOpenDashboard} className={primaryButtonClass}>Dashboard</button>
+              <>
+                <button type="button" onClick={onOpenDashboard} className={primaryButtonClass}>Dashboard</button>
+                <button type="button" onClick={handleBookConsultation} className={primaryButtonClass}>Book Consultation</button>
+              </>
             ) : (
               <>
                 <button
@@ -2572,8 +2142,8 @@ function PreliminaryCorporateSite({
                 >
                   Get Started
                 </button>
+                <button type="button" onClick={handleBookConsultation} className={primaryButtonClass}>Book Consultation</button>
                 <button type="button" onClick={onLogin} className={secondaryButtonClass}>Login</button>
-                <button type="button" onClick={onOpenOwnerSetup} className={secondaryButtonClass}>Owner Setup</button>
               </>
             )}
           </div>
@@ -2605,7 +2175,10 @@ function PreliminaryCorporateSite({
               ))}
               <div className="mt-2 grid gap-2">
                 {isAuthenticated ? (
-                  <button type="button" onClick={onOpenDashboard} className={primaryButtonClass}>Dashboard</button>
+                  <>
+                    <button type="button" onClick={onOpenDashboard} className={primaryButtonClass}>Dashboard</button>
+                    <button type="button" onClick={handleBookConsultation} className={primaryButtonClass}>Book Consultation</button>
+                  </>
                 ) : (
                   <>
                     <button
@@ -2619,8 +2192,8 @@ function PreliminaryCorporateSite({
                     >
                       Get Started
                     </button>
+                    <button type="button" onClick={handleBookConsultation} className={primaryButtonClass}>Book Consultation</button>
                     <button type="button" onClick={onLogin} className={secondaryButtonClass}>Login</button>
-                    <button type="button" onClick={onOpenOwnerSetup} className={secondaryButtonClass}>Owner Setup</button>
                   </>
                 )}
               </div>
@@ -2646,95 +2219,11 @@ function PreliminaryCorporateSite({
 
       <ClientSupportWidgetExperience clientName="Website Visitor" businessName="Website Inquiry" />
 
-      <footer className="border-t border-slate-200 bg-[#0f234e] text-blue-100">
-        <div className="mx-auto grid w-[min(1160px,92vw)] gap-8 py-12 md:grid-cols-2 xl:grid-cols-5">
-          <section className="space-y-4">
-            <div className="inline-flex items-center gap-2">
-              <KiaminaLogo className="h-10 w-auto" />
-              <span className="text-sm font-bold text-white">Kiamina Accounting Services</span>
-            </div>
-            <p className="text-sm leading-7 text-blue-100/90">
-              Strategic accounting, bookkeeping, payroll, and tax compliance advisory serving organizations across Nigeria, Canada, United States, United Kingdom, and Australia.
-            </p>
-            <div className="flex flex-wrap gap-2 text-xs font-semibold">
-              <span className="rounded-full border border-white/30 px-3 py-1">Compliance-Driven</span>
-              <span className="rounded-full border border-white/30 px-3 py-1">Audit-Ready</span>
-              <span className="rounded-full border border-white/30 px-3 py-1">Cross-Border</span>
-            </div>
-          </section>
+      <div className="fixed bottom-5 right-5 z-40 hidden flex-col gap-3 lg:flex">
+        {SOCIAL_LINKS.map((social) => <SocialBadge key={social.name} href={social.href} name={social.name} />)}
+      </div>
 
-          <section>
-            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-blue-200">Services</h3>
-            <ul className="mt-4 space-y-2 text-sm">
-              {SERVICE_PILLARS.slice(0, 6).map((item) => (
-                <li key={item} className="text-blue-100/90">{item}</li>
-              ))}
-            </ul>
-          </section>
-
-          <section>
-            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-blue-200">Quick Links</h3>
-            <div className="mt-4 grid gap-2 text-sm">
-              <button type="button" onClick={() => handleNavigate('home')} className="text-left text-blue-100/90 transition-colors hover:text-white">Home</button>
-              <button type="button" onClick={() => handleNavigate('about')} className="text-left text-blue-100/90 transition-colors hover:text-white">About</button>
-              <button type="button" onClick={() => handleNavigate('services')} className="text-left text-blue-100/90 transition-colors hover:text-white">Services</button>
-              <button type="button" onClick={() => handleNavigate('insights')} className="text-left text-blue-100/90 transition-colors hover:text-white">Insights</button>
-              <button type="button" onClick={() => handleNavigate('careers')} className="text-left text-blue-100/90 transition-colors hover:text-white">Careers</button>
-              <button type="button" onClick={() => handleNavigate('contact')} className="text-left text-blue-100/90 transition-colors hover:text-white">Contact</button>
-              <button type="button" onClick={handleEngageService} className="text-left text-blue-100/90 transition-colors hover:text-white">Get Started</button>
-            </div>
-          </section>
-
-          <section>
-            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-blue-200">Global Regions</h3>
-            <ul className="mt-4 space-y-2 text-sm">
-              {REGION_ITEMS.map((item) => (
-                <li key={`footer-region-${item.id}`} className="flex items-center gap-2 text-blue-100/90">
-                  <BrandImage src={item.flag} alt={`${item.label} flag`} className="h-4 w-6 rounded-sm border border-white/20" />
-                  <span>{item.label}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="space-y-3">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-blue-200">Contact</h3>
-            <p className="flex items-start gap-2 text-sm text-blue-100/90">
-              <Building2 className="mt-0.5 h-4 w-4" />
-              10 Akpunonu Street, Port Harcourt, Rivers State, Nigeria, 500102
-            </p>
-            <p className="flex items-center gap-2 text-sm text-blue-100/90">
-              <Phone className="h-4 w-4" />
-              +234 906 496 2073
-            </p>
-            <p className="flex items-center gap-2 text-sm text-blue-100/90">
-              <Mail className="h-4 w-4" />
-              info@kiaminaaccounting.com
-            </p>
-            <p className="flex items-center gap-2 text-sm text-blue-100/90">
-              <Clock3 className="h-4 w-4" />
-              Mon - Fri, 8:00 AM - 6:00 PM (WAT)
-            </p>
-          </section>
-        </div>
-        <div className="border-t border-white/20">
-          <div className="mx-auto flex w-[min(1160px,92vw)] flex-wrap items-center justify-between gap-3 py-5 text-xs text-blue-100/80">
-            <p>&copy; {new Date().getFullYear()} Kiamina Accounting Services. All rights reserved.</p>
-            <div className="flex items-center gap-4">
-              <button type="button" onClick={() => handleNavigate('about')} className="transition-colors hover:text-white">About</button>
-              <button type="button" onClick={() => handleNavigate('services')} className="transition-colors hover:text-white">Services</button>
-              <button type="button" onClick={() => handleNavigate('insights')} className="transition-colors hover:text-white">Insights</button>
-              <button type="button" onClick={() => handleNavigate('contact')} className="transition-colors hover:text-white">Contact</button>
-              <button type="button" onClick={onOpenOwnerSetup} className="rounded-full border border-white/20 px-3 py-1.5 font-semibold text-blue-100 hover:bg-white/10">
-                Owner Setup
-              </button>
-              <button type="button" onClick={onOpenAdminPortal} className="rounded-full border border-white/30 px-3 py-1.5 font-semibold text-blue-50 hover:bg-white/10">
-                Admin Portal
-              </button>
-            </div>
-          </div>
-        </div>
-      </footer>
+      {renderFooter()}
     </div>
   )
 }

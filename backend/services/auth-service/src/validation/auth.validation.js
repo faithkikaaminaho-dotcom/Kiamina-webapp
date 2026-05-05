@@ -284,6 +284,7 @@ const registerAccountSchema = Joi.object({
     "any.only": `provider must be one of: ${AUTH_PROVIDERS_TEXT}`,
     "string.empty": `provider must be one of: ${AUTH_PROVIDERS_TEXT}`
   }),
+  hasPassword: Joi.boolean().optional(),
   emailVerified: Joi.boolean().default(false),
   phoneVerified: Joi.boolean().default(false)
 });
@@ -425,6 +426,9 @@ export const validateRegisterAccountPayload = (body) => {
     {
       ...source,
       fullName: source.fullName ?? source.displayName,
+      hasPassword: source.hasPassword === undefined
+        ? String(source.provider || "").trim().toLowerCase() === "email-password"
+        : normalizeBoolean(source.hasPassword, false),
       emailVerified: normalizeBoolean(source.emailVerified, false),
       phoneVerified: normalizeBoolean(source.phoneVerified, false)
     },
@@ -440,6 +444,7 @@ export const validateRegisterAccountPayload = (body) => {
       role: value?.role || "client",
       status: value?.status || "active",
       provider: value?.provider || "email-password",
+      hasPassword: Boolean(value?.hasPassword),
       emailVerified: Boolean(value?.emailVerified),
       phoneVerified: Boolean(value?.phoneVerified)
     }

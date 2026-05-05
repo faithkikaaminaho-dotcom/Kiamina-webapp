@@ -18,6 +18,9 @@ function AdminOtpModal({ challenge, onVerifyOtp, onResendOtp, onCancelOtp }) {
   const inputRefs = useRef([])
 
   const otpCode = otpDigits.join('')
+  const deliveryStatusMessage = challenge?.deliveryError
+    ? 'Email delivery could not be confirmed. Please resend the code if it does not arrive.'
+    : ''
 
   const handleOtpChange = (index, rawValue) => {
     const numericValue = rawValue.replace(/\D/g, '')
@@ -113,6 +116,7 @@ function AdminOtpModal({ challenge, onVerifyOtp, onResendOtp, onCancelOtp }) {
         <h3 className="text-xl font-semibold text-text-primary">Admin Verification</h3>
         <p className="text-sm text-text-secondary mt-2">Enter the 6-digit verification code sent to your email.</p>
         <p className="text-xs text-text-muted mt-1">{maskEmailAddress(challenge?.email)}</p>
+        {deliveryStatusMessage ? <p className="mt-3 text-xs font-medium text-amber-600">{deliveryStatusMessage}</p> : null}
 
         <div className="mt-6" onPaste={handleOtpPaste}>
           <div className="grid grid-cols-6 gap-2">

@@ -325,7 +325,7 @@ function AdminAccountSetup({
       >
         <div className="w-full max-w-lg bg-white border border-border-light rounded-xl shadow-card p-8">
           <div className="flex items-center justify-center mb-6">
-            <KiaminaLogo className="h-12 w-auto" />
+            <KiaminaLogo className="h-32 w-auto" />
           </div>
 
           <h1 className="text-2xl font-semibold text-text-primary text-center">Admin Account Setup</h1>
@@ -354,7 +354,7 @@ function AdminAccountSetup({
       >
         <div className="w-full max-w-lg bg-white border border-border-light rounded-xl shadow-card p-8">
           <div className="flex items-center justify-center mb-6">
-            <KiaminaLogo className="h-12 w-auto" />
+            <KiaminaLogo className="h-32 w-auto" />
           </div>
 
           <h1 className="text-2xl font-semibold text-text-primary text-center">Admin Account Setup</h1>
@@ -385,7 +385,7 @@ function AdminAccountSetup({
       >
         <div className="w-full max-w-lg bg-white border border-border-light rounded-xl shadow-card p-8">
           <div className="flex items-center justify-center mb-6">
-            <KiaminaLogo className="h-12 w-auto" />
+            <KiaminaLogo className="h-32 w-auto" />
           </div>
 
           <h1 className="text-2xl font-semibold text-text-primary text-center">Admin Account Setup</h1>
@@ -415,7 +415,7 @@ function AdminAccountSetup({
         <div className="grid lg:grid-cols-[0.95fr,1.35fr]">
           <div className="bg-[linear-gradient(145deg,#0f2458,#153585_58%,#2d67d1)] px-8 py-8 text-white">
             <div className="flex items-center justify-between gap-3">
-              <KiaminaLogo className="h-12 w-auto" />
+              <KiaminaLogo className="h-32 w-auto" />
               <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-50">
                 {isOwnerBootstrapMode ? <Crown className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
                 {isOwnerBootstrapMode ? 'Owner Bootstrap' : 'Admin Invite'}

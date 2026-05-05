@@ -72,6 +72,27 @@ const generateLocalUid = () => `local_${crypto.randomUUID().replace(/-/g, "")}`;
 
 const generateSessionId = () => crypto.randomUUID().replace(/-/g, "");
 
+const normalizeProvider = (provider = "") =>
+  String(provider || "").trim().toLowerCase();
+
+const mergeAccountProviders = ({
+  existing = null,
+  provider = "",
+  hasPassword = undefined
+} = {}) => {
+  const providers = new Set(
+    Array.isArray(existing?.providers)
+      ? existing.providers.map(normalizeProvider).filter(Boolean)
+      : []
+  );
+  const existingProvider = normalizeProvider(existing?.provider);
+  const nextProvider = normalizeProvider(provider);
+  if (existingProvider) providers.add(existingProvider);
+  if (nextProvider) providers.add(nextProvider);
+  if (hasPassword === true) providers.add("email-password");
+  return Array.from(providers);
+};
+
 const buildAuthAccountPayload = ({
   existing = null,
   uid,
@@ -80,25 +101,38 @@ const buildAuthAccountPayload = ({
   role,
   provider,
   status,
+  hasPassword,
   emailVerified,
   phoneVerified
-}) => ({
-  uid,
-  email,
-  fullName: fullName || existing?.fullName || "",
-  role: role || existing?.role || "client",
-  provider: provider || existing?.provider || "email-password",
-  status: status || existing?.status || "active",
-  emailVerified:
-    typeof emailVerified === "boolean"
-      ? emailVerified
-      : Boolean(existing?.emailVerified),
-  phoneVerified:
-    typeof phoneVerified === "boolean"
-      ? phoneVerified
-      : Boolean(existing?.phoneVerified),
-  onboardingStartedAt: existing?.onboardingStartedAt || new Date()
-});
+}) => {
+  const providers = mergeAccountProviders({ existing, provider, hasPassword });
+  const resolvedHasPassword =
+    typeof hasPassword === "boolean"
+      ? hasPassword
+      : Boolean(existing?.hasPassword || providers.includes("email-password"));
+
+  return {
+    uid,
+    email,
+    fullName: fullName || existing?.fullName || "",
+    role: role || existing?.role || "client",
+    provider: existing?.provider || provider || "email-password",
+    providers: resolvedHasPassword
+      ? Array.from(new Set([...providers, "email-password"]))
+      : providers,
+    hasPassword: resolvedHasPassword,
+    status: status || existing?.status || "active",
+    emailVerified:
+      typeof emailVerified === "boolean"
+        ? emailVerified
+        : Boolean(existing?.emailVerified),
+    phoneVerified:
+      typeof phoneVerified === "boolean"
+        ? phoneVerified
+        : Boolean(existing?.phoneVerified),
+    onboardingStartedAt: existing?.onboardingStartedAt || new Date()
+  };
+};
 
 const migrateAuthAccountUid = async ({
   account,
@@ -108,6 +142,7 @@ const migrateAuthAccountUid = async ({
   role,
   provider,
   status,
+  hasPassword,
   emailVerified,
   phoneVerified
 }) => {
@@ -135,6 +170,7 @@ const migrateAuthAccountUid = async ({
       role,
       provider,
       status,
+      hasPassword,
       emailVerified,
       phoneVerified
     })
@@ -176,6 +212,7 @@ export const registerOrUpdateAuthAccount = async ({
   role,
   provider,
   status,
+  hasPassword,
   emailVerified,
   phoneVerified
 }) => {
@@ -197,6 +234,7 @@ export const registerOrUpdateAuthAccount = async ({
       role,
       provider,
       status,
+      hasPassword,
       emailVerified,
       phoneVerified
     });
@@ -220,6 +258,7 @@ export const registerOrUpdateAuthAccount = async ({
       role,
       provider,
       status,
+      hasPassword,
       emailVerified,
       phoneVerified
     })

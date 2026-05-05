@@ -39,7 +39,7 @@ const SUPPORT_LEAD_STATUS_VALUES = new Set(['new', 'contacted', 'qualified', 'co
 const NEWSLETTER_STATUS_VALUES = new Set(['subscribed', 'unsubscribed', 'bounced'])
 
 const SUPPORT_TIMEZONE = 'Africa/Lagos'
-const SUPPORT_WORKING_HOURS_TEXT = 'Mon-Fri 8:00 AM - 6:00 PM, Sat-Sun 9:00 AM - 1:00 PM (WAT)'
+const SUPPORT_WORKING_HOURS_TEXT = 'Mon-Fri 8:00 AM - 5:00 PM, Sat-Sun 9:00 AM - 1:00 PM (WAT)'
 const SUPPORT_AGENT_OFFLINE_TEXT = `Human agents are currently offline. Working hours: ${SUPPORT_WORKING_HOURS_TEXT}.`
 const SUPPORT_BACKEND_REFRESH_STALE_MS = 45000
 const LEAD_GEO_LOOKUP_ENDPOINTS = Object.freeze([
@@ -64,6 +64,7 @@ const SUPPORT_MESSAGE_STATUS = Object.freeze({
   SENDING: 'sending',
   SENT: 'sent',
   FAILED: 'failed',
+  TYPING: 'typing',
 })
 
 const SUPPORT_SENDER = Object.freeze({
@@ -311,7 +312,7 @@ export const isSupportAgentOnline = (referenceDate = new Date()) => {
   const { weekdayShort, hour, minute } = getSupportLocalTimeParts(referenceDate)
   const isWeekend = weekdayShort === 'sat' || weekdayShort === 'sun'
   const startHour = isWeekend ? 9 : 8
-  const endHour = isWeekend ? 13 : 18
+  const endHour = isWeekend ? 13 : 17
   const decimalHour = hour + (minute / 60)
   return decimalHour >= startHour && decimalHour < endHour
 }
@@ -336,6 +337,7 @@ const normalizeMessage = (message = {}, index = 0) => ({
   retryCount: Number.isFinite(Number(message.retryCount)) ? Number(message.retryCount) : 0,
   readByClient: Boolean(message.readByClient),
   readByAdmin: Boolean(message.readByAdmin),
+  isTyping: Boolean(message.isTyping),
   attachments: (Array.isArray(message.attachments) ? message.attachments : [])
     .map((attachment, attachmentIndex) => normalizeAttachment(attachment, attachmentIndex)),
 })
@@ -842,6 +844,25 @@ const createPendingMessage = ({
   attachments: (Array.isArray(attachments) ? attachments : []).map((attachment, index) => normalizeAttachment(attachment, index)),
 })
 
+const createTypingMessage = ({
+  id = '',
+  sender = SUPPORT_SENDER.BOT,
+  senderName = 'Kiamina Support Bot',
+} = {}) => ({
+  id: toTrimmedValue(id) || createId('MSGTYPING'),
+  sender,
+  senderName,
+  text: '',
+  createdAtIso: nowIso(),
+  deliveryStatus: SUPPORT_MESSAGE_STATUS.TYPING,
+  deliveryError: '',
+  retryCount: 0,
+  readByClient: false,
+  readByAdmin: false,
+  isTyping: true,
+  attachments: [],
+})
+
 const getTicketById = (tickets = [], ticketId = '') => (
   tickets.find((ticket) => ticket.id === ticketId) || null
 )
@@ -1228,26 +1249,69 @@ const queueMessageDelivery = ({
   }, delayMs)
 }
 
-const appendBotReply = ({ ticketId = '', promptText = '' }) => {
+const queueBotReplyDisplay = ({
+  ticketId = '',
+  replyText = '',
+  replyMessage = null,
+} = {}) => {
+  const normalizedTicketId = toTrimmedValue(ticketId)
+  const normalizedReplyText = String(replyText || replyMessage?.text || '').trim()
+  if (!normalizedTicketId || !normalizedReplyText) return
+
+  const typingMessageId = `typing-${normalizedTicketId}`
+  updateSupportTickets((tickets) => {
+    const ticket = getTicketById(tickets, normalizedTicketId)
+    if (!ticket) return tickets
+    if (ticket.status === SUPPORT_TICKET_STATUS.RESOLVED) return tickets
+    if (ticket.channel !== SUPPORT_CHANNEL.BOT) return tickets
+    if (ticket.messages.some((message) => message.id === typingMessageId || message.isTyping)) {
+      return tickets
+    }
+    const typingMessage = createTypingMessage({ id: typingMessageId })
+    return replaceTicket(tickets, updateTicketWithMessage({
+      ticket,
+      message: typingMessage,
+      incrementClientUnread: false,
+    }))
+  })
+
+  const baseDelayMs = 1200
+  const variableDelayMs = Math.min(2400, Math.max(700, normalizedReplyText.length * 18))
+  const delayMs = baseDelayMs + Math.floor(Math.random() * 500) + variableDelayMs
+
   setTimeout(() => {
     updateSupportTickets((tickets) => {
-      const ticket = getTicketById(tickets, ticketId)
+      const ticket = getTicketById(tickets, normalizedTicketId)
       if (!ticket) return tickets
       if (ticket.status === SUPPORT_TICKET_STATUS.RESOLVED) return tickets
       if (ticket.channel !== SUPPORT_CHANNEL.BOT) return tickets
 
-      const botMessage = createImmediateMessage({
+      const withoutTyping = ticket.messages.filter((message) => message.id !== typingMessageId && !message.isTyping)
+      const nextBotMessage = normalizeMessage(replyMessage || createImmediateMessage({
         sender: SUPPORT_SENDER.BOT,
         senderName: 'Kiamina Support Bot',
-        text: buildSupportBotReply(promptText),
-      })
-      return replaceTicket(tickets, updateTicketWithMessage({
-        ticket,
-        message: botMessage,
-        incrementClientUnread: true,
+        text: normalizedReplyText,
+      }))
+      const mergedMessages = withoutTyping.some((message) => message.id === nextBotMessage.id)
+        ? withoutTyping
+        : [...withoutTyping, nextBotMessage]
+      return replaceTicket(tickets, normalizeTicket({
+        ...ticket,
+        messages: mergedMessages.sort((left, right) => (
+          (Date.parse(left.createdAtIso || '') || 0) - (Date.parse(right.createdAtIso || '') || 0)
+        )),
+        updatedAtIso: nextBotMessage.createdAtIso || nowIso(),
+        unreadByClient: Number(ticket.unreadByClient || 0) + 1,
       }))
     })
-  }, 420 + Math.floor(Math.random() * 300))
+  }, delayMs)
+}
+
+const appendBotReply = ({ ticketId = '', promptText = '' }) => {
+  queueBotReplyDisplay({
+    ticketId,
+    replyText: buildSupportBotReply(promptText),
+  })
 }
 
 const shouldRequestAgent = (text = '') => AGENT_REQUEST_PATTERN.test(String(text || '').trim())
@@ -2098,6 +2162,32 @@ const mergeBackendSupportMessageIntoState = ({
   })
 }
 
+const mergeLocalTransientMessages = (backendTicket = {}, localTicket = null) => {
+  const backendMessages = Array.isArray(backendTicket?.messages) ? backendTicket.messages : []
+  const localMessages = Array.isArray(localTicket?.messages) ? localTicket.messages : []
+  const mergedMessages = [...backendMessages]
+
+  localMessages.forEach((message) => {
+    const status = toTrimmedValue(message?.deliveryStatus)
+    const isTransient = (
+      status === SUPPORT_MESSAGE_STATUS.SENDING
+      || status === SUPPORT_MESSAGE_STATUS.FAILED
+      || status === SUPPORT_MESSAGE_STATUS.TYPING
+    )
+    if (!isTransient) return
+    if (mergedMessages.some((entry) => entry.id === message.id)) return
+    mergedMessages.push(normalizeMessage(message))
+  })
+
+  return normalizeTicket({
+    ...backendTicket,
+    messages: mergedMessages.sort((left, right) => (
+      (Date.parse(left.createdAtIso || '') || 0) - (Date.parse(right.createdAtIso || '') || 0)
+    )),
+    updatedAtIso: mergedMessages[mergedMessages.length - 1]?.createdAtIso || backendTicket?.updatedAtIso || nowIso(),
+  })
+}
+
 const applyLeadMetadataToTicket = (ticket = {}, leadRows = supportState.leads) => {
   const lead = getLeadByClientEmail(leadRows, ticket.clientEmail)
   if (!lead) return ticket
@@ -2357,6 +2447,10 @@ export const refreshSupportStateFromBackend = async () => {
       )),
     ])
       .map((ticket) => applyLeadMetadataToTicket(ticket, leadRowsForTicketMetadata))
+      .map((ticket) => mergeLocalTransientMessages(
+        ticket,
+        supportState.tickets.find((localTicket) => localTicket.id === ticket.id) || null,
+      ))
       .map((ticket) => withComputedUnreadCounts(ticket))
 
     if (!hasAuthenticatedBackend && anonymousSessionId) {
@@ -3164,9 +3258,16 @@ export const sendClientSupportMessage = async ({
             businessName,
             messages: [
               chatMessageResponse?.data?.userMessage,
-              chatMessageResponse?.data?.assistantMessage,
             ].filter(Boolean),
           })
+          if (chatMessageResponse?.data?.assistantMessage) {
+            queueBotReplyDisplay({
+              ticketId: sessionResult.sessionId,
+              replyMessage: mapChatMessagesFromBackend([
+                chatMessageResponse.data.assistantMessage,
+              ], { sessionId: sessionResult.sessionId })[0] || null,
+            })
+          }
         }
         return {
           ok: true,

@@ -61,6 +61,12 @@ const PHONE_COUNTRY_CODE_OPTIONS = [
   { value: '+44', label: 'UK +44' },
   { value: '+61', label: 'AU +61' },
 ]
+const PHONE_COUNTRY_CODE_DIGIT_OPTIONS = PHONE_COUNTRY_CODE_OPTIONS
+  .map((option) => ({
+    code: option.value,
+    digits: option.value.replace(/\D/g, ''),
+  }))
+  .sort((left, right) => right.digits.length - left.digits.length)
 const ACCOUNT_DELETE_REASON_OPTIONS = [
   'Too expensive',
   'Missing features',
@@ -179,6 +185,10 @@ const normalizeAccountSettingsState = (payload = {}) => {
 const resolvePhoneParts = (value = '', fallbackCode = '+234') => {
   const raw = String(value || '').trim()
   const matchingOption = PHONE_COUNTRY_CODE_OPTIONS.find((option) => raw.startsWith(option.value))
+  const compactDigits = raw.replace(/\D/g, '')
+  const digitMatchedOption = !matchingOption && compactDigits
+    ? PHONE_COUNTRY_CODE_DIGIT_OPTIONS.find((option) => compactDigits.startsWith(option.digits))
+    : null
   if (!raw) {
     return {
       code: fallbackCode,
@@ -186,14 +196,26 @@ const resolvePhoneParts = (value = '', fallbackCode = '+234') => {
     }
   }
   if (!matchingOption) {
+    if (digitMatchedOption) {
+      const derivedNumber = compactDigits.slice(digitMatchedOption.digits.length)
+      return {
+        code: digitMatchedOption.code,
+        number: derivedNumber.length === 11 && derivedNumber.startsWith('0')
+          ? derivedNumber.slice(1)
+          : derivedNumber,
+      }
+    }
     return {
       code: fallbackCode,
-      number: raw,
+      number: compactDigits || raw,
     }
   }
+  const derivedNumber = raw.slice(matchingOption.value.length).replace(/\D/g, '').trim()
   return {
     code: matchingOption.value,
-    number: raw.slice(matchingOption.value.length).trim(),
+    number: derivedNumber.length === 11 && derivedNumber.startsWith('0')
+      ? derivedNumber.slice(1)
+      : derivedNumber,
   }
 }
 const formatPhoneNumber = (code = '+234', number = '') => {
@@ -354,11 +376,14 @@ function SettingsPage({
   initialAccountSettings = {},
   initialNotificationSettings = {},
   onSettingsProfileChange,
+  onClientAssetChange,
   onVerificationDocsChange,
   onAccountSettingsChange,
   onNotificationSettingsChange,
   verificationLockEnforced = false,
   canManageAccountSecurity = false,
+  authProvider = '',
+  hasPassword = undefined,
   onRequestPasswordResetLink,
   onChangePassword,
   canDeleteAccount = false,
@@ -575,6 +600,11 @@ function SettingsPage({
     isVerifying: false,
     expiresAt: '',
   })
+  const [saveConfirmation, setSaveConfirmation] = useState({
+    open: false,
+    title: '',
+    message: '',
+  })
 
   const toTrimmedValue = (value) => String(value || '').trim()
   const buildClientFullName = (payload = {}) => {
@@ -613,6 +643,11 @@ function SettingsPage({
     return 'Primary Owner'
   }
   const normalizedTeamRole = normalizeClientRole(clientTeamRole)
+  const normalizedAuthProvider = toTrimmedValue(authProvider).toLowerCase()
+  const passwordIsConfigured = hasPassword === undefined
+    ? normalizedAuthProvider !== 'google'
+    : Boolean(hasPassword)
+  const passwordActionLabel = passwordIsConfigured ? 'Change Password' : 'Add Password'
   const canManageTeam = normalizedTeamRole === 'owner'
   const isAffiliatedTeamMember = Boolean(clientTeamAffiliation?.isTeamMember)
   const affiliatedWorkspaceSections = ['business-profile', 'tax-details']
@@ -858,6 +893,28 @@ function SettingsPage({
     && normalizedProfileForVerification.address,
   )
   const businessVerificationNotice = 'Business verification is turned off for the MVP. You can continue without uploads or approval.'
+  const sectionSaveCopy = {
+    'user-profile': {
+      title: 'Profile Updated',
+      message: 'Your profile changes have been saved successfully.',
+    },
+    'business-profile': {
+      title: 'Business Profile Updated',
+      message: 'Your business profile changes have been saved successfully.',
+    },
+    'tax-details': {
+      title: 'Tax Details Updated',
+      message: 'Your tax details have been saved successfully.',
+    },
+    'registered-address': {
+      title: 'Address Updated',
+      message: 'Your registered address has been saved successfully.',
+    },
+    notifications: {
+      title: 'Notifications Updated',
+      message: 'Your notification preferences have been saved successfully.',
+    },
+  }
   /*
   const identityDocumentCaptured = Boolean(
     toTrimmedValue(verificationDocs.govId)
@@ -1250,12 +1307,24 @@ function SettingsPage({
       return
     }
     setDraftData(formData)
+    if (section === 'user-profile') {
+      setPhotoFile(profilePhoto || null)
+    }
+    if (section === 'business-profile') {
+      setLogoFile(companyLogo || null)
+    }
     setErrors({})
     setEditMode(prev => ({ ...prev, [section]: true }))
   }
 
   const cancelSectionEdit = (section) => {
     setDraftData(formData)
+    if (section === 'user-profile') {
+      setPhotoFile(profilePhoto || null)
+    }
+    if (section === 'business-profile') {
+      setLogoFile(companyLogo || null)
+    }
     setErrors({})
     setEditMode(prev => ({ ...prev, [section]: false }))
   }
@@ -1399,6 +1468,30 @@ function SettingsPage({
         return false
       }
     }
+    if (section === 'user-profile' && photoFile !== profilePhoto) {
+      if (typeof onClientAssetChange === 'function') {
+        const assetResult = await onClientAssetChange({ profilePhoto: photoFile || '' })
+        if (assetResult?.ok === false) {
+          showToast('error', assetResult.message || 'Unable to save your profile picture right now.')
+          return false
+        }
+      } else {
+        setProfilePhoto(photoFile || '')
+      }
+      writeLegacyString(profilePhotoKey, photoFile || '')
+    }
+    if (section === 'business-profile' && logoFile !== companyLogo) {
+      if (typeof onClientAssetChange === 'function') {
+        const assetResult = await onClientAssetChange({ companyLogo: logoFile || '' })
+        if (assetResult?.ok === false) {
+          showToast('error', assetResult.message || 'Unable to save your company logo right now.')
+          return false
+        }
+      } else {
+        setCompanyLogo(logoFile || '')
+      }
+      writeLegacyString(companyLogoKey, logoFile || '')
+    }
     setFormData({
       ...updatedData,
       phoneCountryCode: persistedData.phoneCountryCode,
@@ -1420,6 +1513,15 @@ function SettingsPage({
     })
     setEditMode(prev => ({ ...prev, [section]: false }))
     setErrors({})
+    const confirmationCopy = sectionSaveCopy[section] || {
+      title: 'Changes Saved',
+      message: 'Your changes have been saved successfully.',
+    }
+    setSaveConfirmation({
+      open: true,
+      title: confirmationCopy.title,
+      message: confirmationCopy.message,
+    })
     showToast('success', 'Changes saved successfully.')
     return true
   }
@@ -1436,6 +1538,12 @@ function SettingsPage({
       onNotificationSettingsChange(normalized)
     }
     setEditMode((prev) => ({ ...prev, notifications: false }))
+    const confirmationCopy = sectionSaveCopy.notifications
+    setSaveConfirmation({
+      open: true,
+      title: confirmationCopy.title,
+      message: confirmationCopy.message,
+    })
     showToast('success', 'Notification preferences updated.')
   }
 
@@ -1673,9 +1781,7 @@ function SettingsPage({
         return
       }
       setLogoFile(dataUrl)
-      setCompanyLogo(dataUrl)
-      writeLegacyString(companyLogoKey, dataUrl)
-      showToast('success', 'Company logo updated successfully.')
+      showToast('success', 'Company logo ready to save.')
       input.value = ''
     }
     reader.onerror = () => {
@@ -1711,9 +1817,7 @@ function SettingsPage({
         return
       }
       setPhotoFile(dataUrl)
-      setProfilePhoto(dataUrl)
-      writeLegacyString(profilePhotoKey, dataUrl)
-      showToast('success', 'Profile picture updated successfully.')
+      showToast('success', 'Profile picture ready to save.')
       input.value = ''
     }
     reader.onerror = () => {
@@ -1972,10 +2076,6 @@ function SettingsPage({
       showToast('error', 'A valid account email is required before you continue.')
       return
     }
-    if (accountSettings.twoStepEnabled) {
-      await startSecurityChallenge('password-reset')
-      return
-    }
     if (typeof onRequestPasswordResetLink !== 'function') {
       showToast('error', 'Password reset is unavailable right now.')
       return
@@ -1983,7 +2083,10 @@ function SettingsPage({
     setIsSendingPasswordResetLink(true)
     const result = await onRequestPasswordResetLink(resolvedClientEmail)
     setIsSendingPasswordResetLink(false)
-    showToast(result?.ok ? 'success' : 'error', result?.message || 'Unable to send password reset link.')
+    showToast(
+      result?.ok ? 'success' : 'error',
+      result?.message || `Unable to send ${passwordActionLabel.toLowerCase()} email.`,
+    )
   }
 
   const validatePasswordChangeForm = () => {
@@ -2032,23 +2135,6 @@ function SettingsPage({
       confirmPassword: '',
     })
     return true
-  }
-
-  const handleChangePasswordAction = async () => {
-    if (!canManageAccountSecurity) {
-      showToast('error', 'Password changes are available only in your direct client session.')
-      return
-    }
-    const validationMessage = validatePasswordChangeForm()
-    if (validationMessage) {
-      showToast('error', validationMessage)
-      return
-    }
-    if (accountSettings.twoStepEnabled) {
-      await startSecurityChallenge('change-password')
-      return
-    }
-    await submitPasswordChange()
   }
 
   const resetDeleteAccountFlow = () => {
@@ -2509,76 +2595,28 @@ function SettingsPage({
             <div className="rounded-lg border border-border-light bg-white p-4">
               <div className="flex flex-col gap-4">
                 <div>
-                  <h4 className="text-sm font-semibold text-text-primary">Change Password</h4>
+                  <h4 className="text-sm font-semibold text-text-primary">{passwordActionLabel}</h4>
                   <p className="text-sm text-text-secondary mt-1">
-                    Update your password within your current session. If you signed up with Google or forgot your password, you can still send a reset link instead.
+                    {passwordIsConfigured
+                      ? 'We will send a secure email confirmation link before you choose a new password.'
+                      : 'You signed in with Google, so no password is set yet. We will email you a secure link to add one.'}
                   </p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1">Current Password</label>
-                    <input
-                      type="password"
-                      value={passwordChangeForm.currentPassword}
-                      onChange={(event) => setPasswordChangeForm((previous) => ({
-                        ...previous,
-                        currentPassword: event.target.value,
-                      }))}
-                      placeholder="Enter current password"
-                      className="w-full px-3 py-2 border border-border-light rounded-md text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1">New Password</label>
-                    <input
-                      type="password"
-                      value={passwordChangeForm.newPassword}
-                      onChange={(event) => setPasswordChangeForm((previous) => ({
-                        ...previous,
-                        newPassword: event.target.value,
-                      }))}
-                      placeholder="Enter new password"
-                      className="w-full px-3 py-2 border border-border-light rounded-md text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1">Confirm New Password</label>
-                    <input
-                      type="password"
-                      value={passwordChangeForm.confirmPassword}
-                      onChange={(event) => setPasswordChangeForm((previous) => ({
-                        ...previous,
-                        confirmPassword: event.target.value,
-                      }))}
-                      placeholder="Confirm new password"
-                      className="w-full px-3 py-2 border border-border-light rounded-md text-sm"
-                    />
-                  </div>
-                </div>
                 <div className="rounded-md border border-border-light bg-background/40 px-3 py-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">Password Rules</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">Email Confirmation Required</p>
                   <p className="mt-1 text-xs text-text-muted">
-                    Minimum 8 characters, at least one uppercase letter, one number, and one special character.
+                    The link goes to your sign-in email and confirms ownership before any password is added or changed.
                   </p>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <button
                     type="button"
-                    onClick={handleChangePasswordAction}
-                    disabled={securityActionsDisabled || isChangingPassword}
-                    className="h-9 px-4 rounded-md bg-primary text-white text-sm font-medium hover:bg-primary-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
-                  >
-                    {isChangingPassword && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {isChangingPassword ? 'Updating...' : 'Update Password'}
-                  </button>
-                  <button
-                    type="button"
                     onClick={handlePasswordResetAction}
                     disabled={securityActionsDisabled || isSendingPasswordResetLink || !resolvedClientEmail}
-                    className="h-9 px-4 rounded-md border border-border-light text-text-primary text-sm font-medium hover:bg-background transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                    className="h-9 px-4 rounded-md bg-primary text-white text-sm font-medium hover:bg-primary-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
                   >
                     {isSendingPasswordResetLink && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {isSendingPasswordResetLink ? 'Sending...' : 'Send Reset Link Instead'}
+                    {isSendingPasswordResetLink ? 'Sending...' : `Email ${passwordActionLabel} Link`}
                   </button>
                 </div>
               </div>
@@ -2589,7 +2627,7 @@ function SettingsPage({
                 <div>
                   <h4 className="text-sm font-semibold text-text-primary">Two-Step Verification</h4>
                   <p className="text-sm text-text-secondary mt-1">
-                    Require an SMS code before sensitive account actions such as password reset and account deletion.
+                    Require an SMS code before sensitive account actions such as account deletion.
                   </p>
                 </div>
                 <button
@@ -2830,178 +2868,67 @@ function SettingsPage({
       }
 
       case 'team-management': {
-        const inviteButtonDisabled = !canManageTeam || isTeamSyncing
-        const sortedTeamMembers = [...teamMembers].sort((left, right) => {
-          if (left.isPrimaryOwner && !right.isPrimaryOwner) return -1
-          if (!left.isPrimaryOwner && right.isPrimaryOwner) return 1
-          return (left.fullName || left.email).localeCompare(right.fullName || right.email)
-        })
-        const sortedTeamInvites = [...teamInvites].sort((left, right) => (
-          Date.parse(right.createdAt || '') - Date.parse(left.createdAt || '')
-        ))
-
         return (
           <div className="space-y-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-text-primary mb-1">Team Management</h3>
-                <p className="text-sm text-text-muted">Manage collaboration access for your company workspace.</p>
-                {isTeamSyncing ? <p className="text-xs text-text-muted mt-1">Syncing team changes...</p> : null}
-              </div>
-              <button
-                type="button"
-                onClick={handleOpenInviteModal}
-                disabled={inviteButtonDisabled}
-                className={`h-9 px-4 rounded-md text-sm font-medium transition-colors inline-flex items-center gap-2 ${
-                  inviteButtonDisabled
-                    ? 'bg-gray-100 text-text-muted cursor-not-allowed'
-                    : 'bg-primary text-white hover:bg-primary-light'
-                }`}
-              >
-                <UserPlus className="w-4 h-4" />
-                Invite Team Member
-              </button>
-            </div>
-
-            <div className={`rounded-lg border p-4 ${teamInviteUnlocked ? 'border-success/20 bg-success-bg/40' : 'border-border-light bg-background/40'}`}>
-              <div className="flex items-start gap-3">
-                <CheckCircle className="w-5 h-5 text-success mt-0.5" />
-                <div>
-                  <p className="text-sm font-semibold text-text-primary">Team Collaboration Enabled</p>
-                  <p className="text-sm text-text-secondary mt-1">
-                    Team invites are available in the MVP without identity or business verification.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {isAffiliatedTeamMember && (
-              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                <p className="text-sm font-semibold text-text-primary">Affiliated Team Member</p>
-                <p className="text-sm text-text-secondary mt-1">
-                  This account is attached to {affiliatedWorkspaceName} and managed by {affiliatedWorkspaceOwnerName}
-                  {affiliatedWorkspaceOwnerEmail ? ` (${affiliatedWorkspaceOwnerEmail})` : ''}.
-                </p>
-              </div>
-            )}
-
-            {!canManageTeam && (
-              <div className="rounded-lg border border-warning/30 bg-warning-bg/40 p-4">
-                <p className="text-sm font-semibold text-text-primary">Owner Permission Required</p>
-                <p className="text-sm text-text-secondary mt-1">
-                  Only the primary account owner can invite users, remove users, or change team roles.
-                </p>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="rounded-lg border border-border-light bg-white p-4">
-                <p className="text-sm font-semibold text-text-primary">Team Members</p>
-                <p className="text-xs text-text-muted mt-1">{sortedTeamMembers.length} active user(s)</p>
-                <div className="mt-4 space-y-3">
-                  {sortedTeamMembers.length === 0 && (
-                    <p className="text-sm text-text-muted">No team members found.</p>
-                  )}
-                  {sortedTeamMembers.map((member) => (
-                    <div key={member.id} className="rounded-md border border-border-light p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-text-primary truncate">{member.fullName || member.email}</p>
-                          <p className="text-xs text-text-muted break-all mt-0.5">{member.email}</p>
-                          <p className="text-xs text-text-muted mt-1">Joined: {formatDateTime(member.joinedAt)}</p>
-                        </div>
-                        <span className={`inline-flex items-center h-6 px-2.5 rounded text-xs font-medium ${
-                          member.isPrimaryOwner
-                            ? 'bg-primary-tint text-primary'
-                            : 'bg-background text-text-secondary'
-                        }`}>
-                          {toRoleLabel(member.role)}
-                        </span>
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        {member.isPrimaryOwner ? (
-                          <span className="text-xs text-text-muted">Primary owner role is fixed.</span>
-                        ) : (
-                          <>
-                            <select
-                              value={member.role}
-                              onChange={(e) => handleTeamRoleChange(member.id, e.target.value)}
-                              disabled={!canManageTeam || isTeamSyncing}
-                              className="h-8 px-2.5 border border-border rounded text-xs text-text-primary focus:outline-none focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              <option value="manager">Manager</option>
-                              <option value="accountant">Accountant</option>
-                              <option value="viewer">Viewer</option>
-                            </select>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveTeamMember(member.id)}
-                              disabled={!canManageTeam || isTeamSyncing}
-                              className="h-8 px-2.5 rounded border border-border text-xs font-medium text-text-primary hover:bg-background disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              Remove
-                            </button>
-                          </>
-                        )}
-                      </div>
+            <div className="rounded-lg border border-border-light bg-white overflow-hidden">
+              <div className="border-b border-border-light bg-background/40 px-5 py-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary-tint px-3 py-1 text-xs font-semibold text-primary">
+                      <Clock className="w-3.5 h-3.5" />
+                      Coming Soon
                     </div>
-                  ))}
+                    <h3 className="mt-4 text-lg font-semibold text-text-primary">Team Management</h3>
+                    <p className="mt-1 max-w-2xl text-sm leading-6 text-text-secondary">
+                      We are preparing workspace collaboration tools for inviting teammates, assigning roles, and controlling access across your accounting workflow.
+                    </p>
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-white">
+                    <Users className="w-5 h-5" />
+                  </div>
                 </div>
               </div>
 
-              <div className="rounded-lg border border-border-light bg-white p-4">
-                <p className="text-sm font-semibold text-text-primary">Invite History</p>
-                <p className="text-xs text-text-muted mt-1">Links expire after 48 hours and are single-use.</p>
-                <div className="mt-4 space-y-3 max-h-[420px] overflow-auto pr-1">
-                  {sortedTeamInvites.length === 0 && (
-                    <p className="text-sm text-text-muted">No invites created yet.</p>
-                  )}
-                  {sortedTeamInvites.map((invite) => {
-                    const status = getInviteStatus(invite)
-                    const isPending = status === 'Pending'
-                    const statusClass = status === 'Accepted'
-                      ? 'bg-success-bg text-success'
-                      : status === 'Cancelled'
-                        ? 'bg-error-bg text-error'
-                        : status === 'Expired'
-                          ? 'bg-warning-bg text-warning'
-                          : 'bg-primary-tint text-primary'
-                    return (
-                      <div key={invite.id} className="rounded-md border border-border-light p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-text-primary break-all">{invite.email}</p>
-                            <p className="text-xs text-text-secondary mt-0.5">{toRoleLabel(invite.role)}</p>
-                            <p className="text-xs text-text-muted mt-1">Invited: {formatDateTime(invite.createdAt)}</p>
-                            <p className="text-xs text-text-muted">Expires: {formatDateTime(invite.expiresAt)}</p>
-                          </div>
-                          <span className={`inline-flex items-center h-6 px-2.5 rounded text-xs font-medium ${statusClass}`}>
-                            {status}
-                          </span>
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleCopyInviteLink(invite)}
-                            className="h-8 px-2.5 rounded border border-border text-xs font-medium text-text-primary hover:bg-background inline-flex items-center gap-1.5"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                            Copy Link
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleCancelInvite(invite.id)}
-                            disabled={!isPending || !canManageTeam || isTeamSyncing}
-                            className="h-8 px-2.5 rounded border border-border text-xs font-medium text-text-primary hover:bg-background disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            Cancel
-                          </button>
-                        </div>
+              <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-3">
+                {[
+                  {
+                    title: 'Invite Teammates',
+                    description: 'Add accountants, managers, and viewers to the right company workspace.',
+                    icon: UserPlus,
+                  },
+                  {
+                    title: 'Role-Based Access',
+                    description: 'Control what each teammate can see, upload, approve, and manage.',
+                    icon: Lock,
+                  },
+                  {
+                    title: 'Audit-Ready Activity',
+                    description: 'Track team actions clearly across documents, support, and settings.',
+                    icon: CheckCircle,
+                  },
+                ].map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <div key={item.title} className="rounded-lg border border-border-light bg-background/30 p-4">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-md bg-white text-primary shadow-sm">
+                        <Icon className="w-4 h-4" />
                       </div>
-                    )
-                  })}
+                      <p className="mt-4 text-sm font-semibold text-text-primary">{item.title}</p>
+                      <p className="mt-2 text-xs leading-6 text-text-secondary">{item.description}</p>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="border-t border-border-light px-5 py-4">
+                <div className="flex items-start gap-3 rounded-lg border border-dashed border-border bg-white p-4">
+                  <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-primary" />
+                  <div>
+                    <p className="text-sm font-semibold text-text-primary">Not available yet</p>
+                    <p className="mt-1 text-sm leading-6 text-text-secondary">
+                      Team invites and role changes are paused while we finish the access-control flow. Existing accounts can continue using the workspace normally.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -3537,6 +3464,30 @@ function SettingsPage({
 
   return (
     <div>
+      {saveConfirmation.open && (
+        <div className="fixed inset-0 z-[230] flex items-center justify-center bg-black/35 p-4">
+          <div className="w-full max-w-sm rounded-xl border border-border-light bg-white p-6 shadow-card">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-success-bg text-success">
+                <CheckCircle className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-text-primary">{saveConfirmation.title}</h3>
+                <p className="mt-2 text-sm text-text-secondary">{saveConfirmation.message}</p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSaveConfirmation({ open: false, title: '', message: '' })}
+                className="h-10 px-4 rounded-md bg-primary text-white text-sm font-medium hover:bg-primary-light transition-colors"
+              >
+                Okay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-semibold text-text-primary">Business Settings</h1>
       </div>

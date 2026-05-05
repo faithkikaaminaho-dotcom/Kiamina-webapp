@@ -41,7 +41,7 @@ function AdminLoginPortal({
     >
       <div className="w-full max-w-md bg-white border border-border-light rounded-xl shadow-card p-8">
         <div className="flex items-center justify-center mb-6">
-          <KiaminaLogo className="h-12 w-auto" />
+          <KiaminaLogo className="h-32 w-auto" />
         </div>
 
         <h1 className="text-2xl font-semibold text-text-primary text-center">Admin Portal</h1>

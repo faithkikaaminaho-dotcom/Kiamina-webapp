@@ -2780,7 +2780,7 @@ function AdminSidebar({
       )}
       <aside className={`w-64 bg-white border-r border-border fixed left-0 top-0 h-screen flex flex-col z-50 transform transition-transform duration-200 ease-out ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
         <div className="p-4 border-b border-border-light">
-          <KiaminaLogo className="h-11 w-auto" />
+          <KiaminaLogo className="h-28 w-auto" />
           <div className="text-[11px] text-text-muted uppercase tracking-wide mt-2">Admin Control</div>
         </div>
 
@@ -2839,6 +2839,7 @@ function AdminTopBar({
   adminFirstName,
   notifications,
   onMarkNotificationRead,
+  onNotificationClick,
   onMarkAllNotificationsRead,
   currentAdminAccount,
   onOpenSidebar,
@@ -3181,7 +3182,13 @@ function AdminTopBar({
                     <div 
                       key={notification.id} 
                       className={`p-3 border-b border-border-light hover:bg-background cursor-pointer ${!notification.read ? 'bg-primary-tint' : ''}`}
-                      onClick={() => onMarkNotificationRead && onMarkNotificationRead(notification.id)}
+                      onClick={() => {
+                        if (onNotificationClick) {
+                          onNotificationClick(notification)
+                          return
+                        }
+                        onMarkNotificationRead?.(notification.id)
+                      }}
                     >
                       <div className="flex items-start gap-2">
                         <Bell className="w-4 h-4 text-text-muted mt-0.5 flex-shrink-0" />

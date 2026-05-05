@@ -39,6 +39,10 @@ const getPublicRouteLimiterKey = (methodValue, pathValue) => {
     return "insights-analytics";
   }
 
+  if (normalizedMethod === "POST" && normalizedPath === "/notifications/contact") {
+    return "contact-form";
+  }
+
   if (
     (normalizedMethod === "GET" || normalizedMethod === "POST") &&
     normalizedPath.startsWith("/notifications/support/public/tickets")

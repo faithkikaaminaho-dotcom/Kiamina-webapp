@@ -95,6 +95,7 @@ export const registerAuthAccountRecord = async ({
   role = 'client',
   provider = 'email-password',
   status = 'active',
+  hasPassword = undefined,
   emailVerified = false,
   phoneVerified = false,
 } = {}) => (
@@ -105,6 +106,9 @@ export const registerAuthAccountRecord = async ({
     role: String(role || 'client').trim().toLowerCase(),
     provider: String(provider || 'email-password').trim().toLowerCase(),
     status: String(status || 'active').trim().toLowerCase(),
+    hasPassword: hasPassword === undefined
+      ? String(provider || '').trim().toLowerCase() === 'email-password'
+      : Boolean(hasPassword),
     emailVerified: Boolean(emailVerified),
     phoneVerified: Boolean(phoneVerified),
   })
@@ -207,6 +211,11 @@ export const persistClientOnboardingToBackend = async ({
     phoneLocalNumber: normalizedPhone,
     roleInCompany: String(onboardingData?.roleInCompany || '').trim(),
     language: String(onboardingData?.language || '').trim() || 'English',
+    address1: String(onboardingData?.address1 || onboardingData?.address || '').trim(),
+    address2: String(onboardingData?.address2 || '').trim(),
+    city: String(onboardingData?.city || '').trim(),
+    postalCode: String(onboardingData?.postalCode || '').trim(),
+    addressCountry: String(onboardingData?.addressCountry || onboardingData?.country || '').trim(),
     businessType,
     businessName: String(onboardingData?.businessName || '').trim(),
     country: String(onboardingData?.country || '').trim(),

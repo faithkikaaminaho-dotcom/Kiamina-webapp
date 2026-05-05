@@ -8,8 +8,6 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example
-    ports:
-      - "27017:27017"
     volumes:
       - mongo_data:/data/db
 
@@ -24,10 +22,11 @@ services:
     build:
       context: ./api-gateway
     container_name: kiamina-api-gateway
+    restart: unless-stopped
     environment:
       NODE_ENV: development
       PORT: 4100
-      CORS_ORIGINS: http://localhost:5173
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175
       AUTH_SERVICE_URL: http://auth-service:4101
       USERS_SERVICE_URL: http://users-service:4102
       DOCUMENTS_SERVICE_URL: http://documents-service:4103
@@ -44,12 +43,19 @@ services:
     build:
       context: ./services/auth-service
     container_name: kiamina-auth-service
+    restart: unless-stopped
+    env_file:
+      - ./services/auth-service/.env.development
     environment:
       NODE_ENV: development
       PORT: 4101
       MONGO_URI: mongodb://root:example@mongo:27017
       MONGO_DB_NAME: kiamina_auth
       OTP_HASH_SECRET: local-dev-secret
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-service-account.json
+      NOTIFICATIONS_SERVICE_URL: http://notifications-service:4104
+    volumes:
+      - ./secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
     depends_on:
       - mongo
     ports:
@@ -59,6 +65,7 @@ services:
     build:
       context: ./services/users-service
     container_name: kiamina-users-service
+    restart: unless-stopped
     environment:
       NODE_ENV: development
       PORT: 4102
@@ -73,6 +80,7 @@ services:
     build:
       context: ./services/documents-service
     container_name: kiamina-documents-service
+    restart: unless-stopped
     environment:
       NODE_ENV: development
       PORT: 4103
@@ -87,6 +95,9 @@ services:
     build:
       context: ./services/notifications-service
     container_name: kiamina-notifications-service
+    restart: unless-stopped
+    env_file:
+      - ./services/notifications-service/.env.development
     environment:
       NODE_ENV: development
       PORT: 4104

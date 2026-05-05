@@ -39,6 +39,9 @@ import {
 } from './adminAssignments'
 import { subscribeToRealtimeEvents } from '../../utils/clientBackendBridge'
 
+const ADMIN_SUPPORT_FOCUS_EMAIL_KEY = 'kiaminaSupportInboxFocusEmail'
+const ADMIN_SUPPORT_FOCUS_TICKET_KEY = 'kiaminaSupportInboxFocusTicketId'
+
 const defaultAdminNotifications = []
 
 const buildKeywordSuggestions = (values = [], limit = 20) => {
@@ -297,6 +300,52 @@ function AdminWorkspace({
 
   const handleMarkAllNotificationsRead = () => {
     setAdminNotifications((prev) => prev.map((notification) => ({ ...notification, read: true })))
+  }
+
+  const handleAdminNotificationClick = (notification = {}) => {
+    const notificationId = String(notification?.id || '').trim()
+    if (notificationId) {
+      handleMarkNotificationRead(notificationId)
+    }
+
+    const normalizedType = String(notification?.type || '').trim().toLowerCase()
+    const normalizedTargetPage = String(notification?.targetPage || '').trim()
+    const normalizedTicketId = String(notification?.ticketId || '').trim()
+    const normalizedClientEmail = String(notification?.clientEmail || '').trim().toLowerCase()
+
+    if (
+      normalizedTargetPage === 'admin-communications'
+      || normalizedType.startsWith('support.')
+      || normalizedType.startsWith('chatbot.')
+    ) {
+      if (typeof localStorage !== 'undefined') {
+        if (normalizedClientEmail) {
+          localStorage.setItem(ADMIN_SUPPORT_FOCUS_EMAIL_KEY, normalizedClientEmail)
+        }
+        if (normalizedTicketId) {
+          localStorage.setItem(ADMIN_SUPPORT_FOCUS_TICKET_KEY, normalizedTicketId)
+        }
+      }
+      setActivePage('admin-communications')
+      return
+    }
+
+    if (normalizedTargetPage) {
+      setActivePage(normalizedTargetPage)
+      return
+    }
+
+    if (normalizedType === 'admin.client-management.updated' || normalizedType.startsWith('client.')) {
+      setActivePage('admin-clients')
+      return
+    }
+
+    if (normalizedType.startsWith('notifications.')) {
+      setActivePage('admin-notifications')
+      return
+    }
+
+    setActivePage('admin-dashboard')
   }
 
   const beginSlowRuntimeWatch = (message = 'Please wait...') => {
@@ -604,6 +653,19 @@ function AdminWorkspace({
           timestamp: formatAdminRealtimeTimestamp(event?.createdAt),
           read: false,
           type: eventType,
+          targetPage: (
+            eventType.startsWith('support.')
+            || eventType.startsWith('chatbot.')
+              ? 'admin-communications'
+              : eventType.startsWith('notifications.')
+                ? 'admin-notifications'
+                : eventType === 'admin.client-management.updated' || eventType.startsWith('client.')
+                  ? 'admin-clients'
+                  : 'admin-dashboard'
+          ),
+          ticketId: String(payload?.ticketId || '').trim(),
+          messageId: String(payload?.messageId || '').trim(),
+          clientEmail: String(payload?.clientEmail || payload?.ownerEmail || '').trim().toLowerCase(),
         }
 
         setAdminNotifications((prev) => {
@@ -792,6 +854,7 @@ function AdminWorkspace({
           adminFirstName={adminFirstName}
           notifications={adminNotifications}
           onMarkNotificationRead={handleMarkNotificationRead}
+          onNotificationClick={handleAdminNotificationClick}
           onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
           currentAdminAccount={currentAdminAccount}
           onOpenSidebar={() => setIsMobileSidebarOpen(true)}

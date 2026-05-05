@@ -1,11 +1,11 @@
-import kiaminaAccountingLogo from '../../assets/kiamina-accounting-logo.svg'
+const KIAMINA_LOGO_SRC = '/img/logo.png'
 
-function KiaminaLogo({ className = 'h-10 w-auto', alt = 'Kiamina Accounting Services logo' }) {
+function KiaminaLogo({ className = 'h-28 w-auto', alt = 'Kiamina Accounting Services logo' }) {
   return (
     <img
-      src={kiaminaAccountingLogo}
+      src={KIAMINA_LOGO_SRC}
       alt={alt}
-      className={className}
+      className={`object-contain ${className}`}
     />
   )
 }

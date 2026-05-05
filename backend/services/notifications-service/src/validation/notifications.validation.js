@@ -56,6 +56,32 @@ const sendEmailSchema = Joi.object({
   })
 });
 
+const contactFormSchema = Joi.object({
+  name: Joi.string().trim().min(2).max(120).required().messages({
+    "any.required": "name is required",
+    "string.empty": "name is required",
+    "string.min": "name must be at least 2 characters",
+    "string.max": "name must be at most 120 characters"
+  }),
+  email: EMAIL_SCHEMA.required().messages({
+    "any.required": "email is required",
+    "string.empty": "email is required",
+    "string.email": "email must be a valid email address"
+  }),
+  company: Joi.string().trim().allow("").max(160).default("").messages({
+    "string.max": "company must be at most 160 characters"
+  }),
+  service: Joi.string().trim().allow("").max(120).default("").messages({
+    "string.max": "service must be at most 120 characters"
+  }),
+  message: Joi.string().trim().min(10).max(5000).required().messages({
+    "any.required": "message is required",
+    "string.empty": "message is required",
+    "string.min": "message must be at least 10 characters",
+    "string.max": "message must be at most 5000 characters"
+  })
+});
+
 const patchStatusSchema = Joi.object({
   status: Joi.string().trim().lowercase().required().valid(...STATUSES).messages({
     "any.required": "status is required",
@@ -127,6 +153,26 @@ export const validateSendEmailPayload = (body) => {
     payload: {
       to: to || [],
       subject: value?.subject || "",
+      message: value?.message || ""
+    }
+  };
+};
+
+export const validateContactFormPayload = (body) => {
+  const source = normalizeSource(body);
+  const { value, error } = contactFormSchema.validate(source, {
+    abortEarly: false,
+    convert: true,
+    stripUnknown: true
+  });
+
+  return {
+    errors: toErrors(error),
+    payload: {
+      name: value?.name || "",
+      email: value?.email || "",
+      company: value?.company || "",
+      service: value?.service || "",
       message: value?.message || ""
     }
   };

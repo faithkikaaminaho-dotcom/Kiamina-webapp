@@ -4,6 +4,7 @@ import {
   listLogs,
   putLog,
   patchLogStatus,
+  sendContactFormEmail,
   sendEmail
 } from "../../controllers/notifications.controller.js";
 import supportRoutes from "./support.routes.js";
@@ -14,6 +15,7 @@ import realtimeEventsRoutes from "./realtime-events.routes.js";
 
 const router = express.Router();
 
+router.post("/contact", sendContactFormEmail);
 router.post("/send-email", sendEmail);
 router.get("/logs", listLogs);
 router.put("/logs/:id", putLog);

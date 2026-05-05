@@ -36,6 +36,15 @@ const authAccountSchema = new mongoose.Schema(
       enum: AUTH_PROVIDERS,
       default: "email-password"
     },
+    providers: {
+      type: [String],
+      enum: AUTH_PROVIDERS,
+      default: []
+    },
+    hasPassword: {
+      type: Boolean,
+      default: false
+    },
     status: {
       type: String,
       enum: ACCOUNT_STATUSES,

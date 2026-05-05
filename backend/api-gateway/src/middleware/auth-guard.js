@@ -5,6 +5,7 @@ const ADMIN_ROLES = new Set(["admin", "owner", "superadmin"]);
 
 const PUBLIC_ROUTE_KEYS = new Set([
   "GET /gateway/info",
+  "POST /notifications/contact",
   "POST /notifications/insights/analytics/events",
   "GET /notifications/insights/articles",
   "GET /notifications/insights/articles/search",

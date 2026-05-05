@@ -33,7 +33,7 @@ const assertCanAccessSession = ({ session, actorUid, isAdmin }) => {
 };
 
 const SUPPORT_WORKING_HOURS_TEXT =
-  "Mon-Fri 8:00 AM - 6:00 PM, Sat-Sun 9:00 AM - 1:00 PM (WAT)";
+  "Mon-Fri 8:00 AM - 5:00 PM, Sat-Sun 9:00 AM - 1:00 PM (WAT)";
 
 const CURATED_REPLY_RULES = [
   {

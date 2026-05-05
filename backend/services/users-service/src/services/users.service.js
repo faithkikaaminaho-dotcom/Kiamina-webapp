@@ -192,17 +192,13 @@ const deriveVerificationSnapshot = ({ currentVerification = {}, profileStepCompl
   const status =
     existingStatus === "suspended" || existingStatus === "rejected"
       ? existingStatus
-      : stepsCompleted >= 3
-        ? "verified"
-        : existingStatus === "submitted"
-          ? "submitted"
-          : "pending";
+      : "verified";
 
   return {
     status,
     profileStepCompleted,
-    stepsCompleted,
-    fullyVerifiedAt: stepsCompleted >= 3 ? new Date() : null
+    stepsCompleted: Math.max(3, stepsCompleted),
+    fullyVerifiedAt: currentVerification?.fullyVerifiedAt || new Date()
   };
 };
 

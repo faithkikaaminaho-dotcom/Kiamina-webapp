@@ -136,6 +136,7 @@ const buildGoogleAuthPayload = async (user = null) => {
   const email = String(user?.email || '').trim().toLowerCase()
   const uid = String(user?.uid || '').trim()
   const fullName = String(user?.displayName || '').trim()
+  const photoURL = String(user?.photoURL || '').trim()
   const parsedName = parseDisplayNameToParts(fullName)
 
   if (!idToken || !email) {
@@ -154,6 +155,7 @@ const buildGoogleAuthPayload = async (user = null) => {
     firstName: parsedName.firstName,
     lastName: parsedName.lastName,
     otherNames: parsedName.otherNames,
+    photoURL,
     message: '',
   }
 }

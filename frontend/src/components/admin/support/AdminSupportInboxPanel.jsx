@@ -123,6 +123,7 @@ const formatLeadCategory = (value = '', list = []) => {
   }).join(', ')
 }
 const SUPPORT_INBOX_FOCUS_EMAIL_KEY = 'kiaminaSupportInboxFocusEmail'
+const SUPPORT_INBOX_FOCUS_TICKET_KEY = 'kiaminaSupportInboxFocusTicketId'
 
 function AdminSupportInboxPanel({
   showToast,
@@ -332,6 +333,19 @@ function AdminSupportInboxPanel({
 
   useEffect(() => {
     if (typeof localStorage === 'undefined' || filteredUserGroups.length === 0) return
+    const pendingFocusTicketId = toTrimmedValue(localStorage.getItem(SUPPORT_INBOX_FOCUS_TICKET_KEY))
+    if (pendingFocusTicketId) {
+      const matchingUser = filteredUserGroups.find((userGroup) => (
+        Array.isArray(userGroup.tickets) && userGroup.tickets.some((ticket) => ticket.id === pendingFocusTicketId)
+      ))
+      if (matchingUser) {
+        setSelectedUserEmail(matchingUser.clientEmail)
+        setSelectedTicketId(pendingFocusTicketId)
+        localStorage.removeItem(SUPPORT_INBOX_FOCUS_TICKET_KEY)
+        localStorage.removeItem(SUPPORT_INBOX_FOCUS_EMAIL_KEY)
+        return
+      }
+    }
     const pendingFocusEmail = toTrimmedValue(localStorage.getItem(SUPPORT_INBOX_FOCUS_EMAIL_KEY)).toLowerCase()
     if (!pendingFocusEmail) return
     const matchingUser = filteredUserGroups.find((userGroup) => (

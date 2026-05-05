@@ -90,10 +90,13 @@ const getClientStatusBadgeClass = (status = '') => {
   return 'bg-warning-bg text-warning'
 }
 
+const CLIENT_SUPPORT_FOCUS_TICKET_STORAGE_KEY = 'kiaminaClientSupportFocusTicketId'
+
 function useClientSupportSession({
   clientEmail = '',
   clientName = 'Client User',
   businessName = '',
+  preferredTicketId = '',
   autoInitialize = false,
   markAsRead = false,
 }) {
@@ -123,9 +126,14 @@ function useClientSupportSession({
       .sort((left, right) => (Date.parse(right.updatedAtIso || '') || 0) - (Date.parse(left.updatedAtIso || '') || 0))
   }, [supportSnapshot, normalizedEmail])
 
-  const activeTicket = useMemo(() => (
-    tickets.find((ticket) => ticket.status !== SUPPORT_TICKET_STATUS.RESOLVED) || tickets[0] || null
-  ), [tickets])
+  const activeTicket = useMemo(() => {
+    const normalizedPreferredTicketId = String(preferredTicketId || '').trim()
+    if (normalizedPreferredTicketId) {
+      const matchedTicket = tickets.find((ticket) => ticket.id === normalizedPreferredTicketId)
+      if (matchedTicket) return matchedTicket
+    }
+    return tickets.find((ticket) => ticket.status !== SUPPORT_TICKET_STATUS.RESOLVED) || tickets[0] || null
+  }, [preferredTicketId, tickets])
 
   const messages = useMemo(() => (
     Array.isArray(activeTicket?.messages) ? activeTicket.messages : []
@@ -136,9 +144,13 @@ function useClientSupportSession({
   ), [tickets])
 
   useEffect(() => {
-    if (!markAsRead || !activeTicket?.id) return
-    markSupportTicketReadByClient(activeTicket.id)
-  }, [markAsRead, activeTicket?.id, messages.length])
+    if (!markAsRead) return
+    tickets.forEach((ticket) => {
+      if (ticket?.id && Number(ticket?.unreadByClient || 0) > 0) {
+        markSupportTicketReadByClient(ticket.id)
+      }
+    })
+  }, [markAsRead, tickets, activeTicket?.id, messages.length])
 
   return {
     tickets,
@@ -190,6 +202,7 @@ function SupportMessagesList({
         const isSystem = message.sender === SUPPORT_SENDER.SYSTEM
         const isSending = message.deliveryStatus === SUPPORT_MESSAGE_STATUS.SENDING
         const isFailed = message.deliveryStatus === SUPPORT_MESSAGE_STATUS.FAILED
+        const isTyping = message.deliveryStatus === SUPPORT_MESSAGE_STATUS.TYPING || message.isTyping
         const bubbleClass = isUser
           ? 'bg-primary text-white border border-primary'
           : isAgent
@@ -203,7 +216,15 @@ function SupportMessagesList({
               <div className={`text-[10px] font-semibold tracking-wide ${isUser ? 'text-white/80' : 'text-text-muted'}`}>
                 {getSupportRoleLabel(message.sender)}
               </div>
-              <p className="text-sm mt-1 leading-snug whitespace-pre-wrap">{message.text || '(No text)'}</p>
+              {isTyping ? (
+                <div className="mt-2 inline-flex items-center gap-1.5 text-sm text-text-secondary">
+                  <span className="h-2 w-2 rounded-full bg-current animate-pulse" />
+                  <span className="h-2 w-2 rounded-full bg-current animate-pulse [animation-delay:180ms]" />
+                  <span className="h-2 w-2 rounded-full bg-current animate-pulse [animation-delay:360ms]" />
+                </div>
+              ) : (
+                <p className="text-sm mt-1 leading-snug whitespace-pre-wrap">{message.text || '(No text)'}</p>
+              )}
               {Array.isArray(message.attachments) && message.attachments.length > 0 && (
                 <div className="mt-2 space-y-1">
                   {message.attachments.map((attachment) => (
@@ -223,7 +244,8 @@ function SupportMessagesList({
                 </div>
               )}
               <div className={`mt-1 flex items-center gap-2 text-[11px] ${isUser ? 'text-white/80' : 'text-text-muted'}`}>
-                <span>{formatSupportMessageTimestamp(message.createdAtIso)}</span>
+                {!isTyping && <span>{formatSupportMessageTimestamp(message.createdAtIso)}</span>}
+                {isTyping && <span>Typing...</span>}
                 {isSending && <span>Sending...</span>}
                 {isFailed && (
                   <>
@@ -333,6 +355,7 @@ function ClientSupportExperience({ clientEmail = '', clientName = 'Client User',
   const [composerError, setComposerError] = useState('')
   const [attachmentPreview, setAttachmentPreview] = useState(null)
   const [nowMs, setNowMs] = useState(Date.now())
+  const [selectedTicketId, setSelectedTicketId] = useState('')
   const previousUnreadCountRef = useRef(0)
   const hasUnreadCountInitializedRef = useRef(false)
   const effectiveClientName = isSignedUpUser
@@ -346,6 +369,7 @@ function ClientSupportExperience({ clientEmail = '', clientName = 'Client User',
     clientEmail: effectiveClientEmail,
     clientName: effectiveClientName || 'Client User',
     businessName,
+    preferredTicketId: selectedTicketId,
     autoInitialize: (embedded ? isOpen : true) && Boolean(effectiveClientEmail),
     markAsRead: (embedded ? isOpen : true) && Boolean(effectiveClientEmail),
   })
@@ -363,6 +387,32 @@ function ClientSupportExperience({ clientEmail = '', clientName = 'Client User',
     const intervalId = window.setInterval(() => setNowMs(Date.now()), 30000)
     return () => window.clearInterval(intervalId)
   }, [])
+
+  useEffect(() => {
+    const availableTickets = Array.isArray(support.tickets) ? support.tickets : []
+    if (availableTickets.length === 0) {
+      setSelectedTicketId('')
+      return
+    }
+    const hasSelectedTicket = availableTickets.some((ticket) => ticket.id === selectedTicketId)
+    if (!hasSelectedTicket) {
+      const defaultTicket = availableTickets.find((ticket) => ticket.status !== SUPPORT_TICKET_STATUS.RESOLVED) || availableTickets[0]
+      setSelectedTicketId(defaultTicket?.id || '')
+    }
+  }, [selectedTicketId, support.tickets])
+
+  useEffect(() => {
+    if (typeof localStorage === 'undefined') return
+    const pendingFocusTicketId = String(localStorage.getItem(CLIENT_SUPPORT_FOCUS_TICKET_STORAGE_KEY) || '').trim()
+    if (!pendingFocusTicketId) return
+    const matchingTicket = support.tickets.find((ticket) => ticket.id === pendingFocusTicketId)
+    if (!matchingTicket) return
+    setSelectedTicketId(matchingTicket.id)
+    localStorage.removeItem(CLIENT_SUPPORT_FOCUS_TICKET_STORAGE_KEY)
+    if (embedded) {
+      setIsOpen(true)
+    }
+  }, [embedded, support.tickets])
 
   useEffect(() => {
     const handlePrimer = () => {
@@ -450,6 +500,9 @@ function ClientSupportExperience({ clientEmail = '', clientName = 'Client User',
       setComposerError(result.message || 'Unable to send support message.')
       return
     }
+    if (result.ticketId) {
+      setSelectedTicketId(String(result.ticketId).trim())
+    }
     setComposerError('')
     setDraftMessage('')
     setComposerAttachments([])
@@ -484,6 +537,9 @@ function ClientSupportExperience({ clientEmail = '', clientName = 'Client User',
     if (!result.ok) {
       setComposerError(result.message || 'Unable to start a new chat right now.')
       return
+    }
+    if (result.ticketId) {
+      setSelectedTicketId(String(result.ticketId).trim())
     }
     setComposerError('')
     setDraftMessage('')
@@ -611,7 +667,7 @@ function ClientSupportExperience({ clientEmail = '', clientName = 'Client User',
             <div className="mt-4 space-y-3 text-sm">
               <div className="rounded-md border border-border-light bg-background p-3"><p className="text-xs text-text-muted uppercase tracking-wide">Email</p><p className="text-text-primary mt-1">info@kiaminaaccounting.com</p></div>
               <div className="rounded-md border border-border-light bg-background p-3"><p className="text-xs text-text-muted uppercase tracking-wide">Phone / WhatsApp</p><p className="text-text-primary mt-1">+2349064962073</p></div>
-              <div className="rounded-md border border-border-light bg-background p-3"><p className="text-xs text-text-muted uppercase tracking-wide">Hours</p><p className="text-text-primary mt-1">Mon-Fri, 8:00 AM - 6:00 PM</p><p className="text-text-primary mt-1">Sat-Sun, 9:00 AM - 1:00 PM</p></div>
+              <div className="rounded-md border border-border-light bg-background p-3"><p className="text-xs text-text-muted uppercase tracking-wide">Hours</p><p className="text-text-primary mt-1">Mon-Fri, 8:00 AM - 5:00 PM</p><p className="text-text-primary mt-1">Sat-Sun, 9:00 AM - 1:00 PM</p></div>
               {activeTicket?.id && <div className="rounded-md border border-border-light bg-background p-3"><p className="text-xs text-text-muted uppercase tracking-wide">Ticket</p><p className="text-text-primary mt-1">{activeTicket.id}</p></div>}
             </div>
           </div>
@@ -627,7 +683,7 @@ function ClientSupportExperience({ clientEmail = '', clientName = 'Client User',
       <button type="button" onClick={() => setIsOpen((prev) => !prev)} className="h-11 px-4 rounded-full bg-primary text-white shadow-card hover:bg-primary-light inline-flex items-center gap-2 relative ml-auto">
         <MessageCircle className="w-4 h-4" />
         <span className="text-sm font-medium">Support</span>
-        {unreadCount > 0 && (
+        {!isOpen && unreadCount > 0 && (
           <span className="absolute -top-1.5 -right-1.5 h-5 min-w-[20px] px-1.5 rounded-full bg-error text-white text-[10px] font-semibold inline-flex items-center justify-center">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>

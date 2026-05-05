@@ -141,6 +141,11 @@ function OnboardingExperience({
     businessName: String(safeData.businessName || teamAffiliation?.companyName || '').trim(),
     country: String(safeData.country || teamAffiliation?.country || '').trim(),
     currency: String(safeData.currency || teamAffiliation?.currency || 'NGN').trim() || 'NGN',
+    address1: String(safeData.address1 || safeData.address || '').trim(),
+    address2: String(safeData.address2 || '').trim(),
+    city: String(safeData.city || '').trim(),
+    postalCode: String(safeData.postalCode || '').trim(),
+    addressCountry: String(safeData.addressCountry || safeData.country || teamAffiliation?.country || '').trim(),
     industry: String(safeData.industry || teamAffiliation?.industry || '').trim(),
     industryOther: String(safeData.industryOther || teamAffiliation?.industryOther || '').trim(),
     cacNumber: String(safeData.cacNumber || teamAffiliation?.cacNumber || '').trim(),
@@ -186,6 +191,9 @@ function OnboardingExperience({
       }
       if (field === 'country') {
         next.currency = COUNTRY_BASE_CURRENCY_MAP[String(normalizedValue || '').trim()] || previous.currency || 'NGN'
+        if (!String(next.addressCountry || '').trim()) {
+          next.addressCountry = normalizedValue
+        }
       }
       next.primaryContact = buildFullName(next)
       next.email = String(next.email || previous.email || '').trim().toLowerCase()
@@ -228,6 +236,9 @@ function OnboardingExperience({
       if (!String(workspaceDetails.businessType || '').trim()) nextErrors.businessType = 'Business type is required.'
       if (!String(workspaceDetails.businessName || '').trim()) nextErrors.businessName = 'Legal business name is required.'
       if (!String(workspaceDetails.country || '').trim()) nextErrors.country = 'Country is required.'
+      if (!String(workspaceDetails.address1 || '').trim()) nextErrors.address1 = 'Address line 1 is required.'
+      if (!String(workspaceDetails.city || '').trim()) nextErrors.city = 'City is required.'
+      if (!String(workspaceDetails.addressCountry || '').trim()) nextErrors.addressCountry = 'Address country is required.'
       if (!String(workspaceDetails.industry || '').trim()) nextErrors.industry = 'Industry is required.'
       if (workspaceDetails.industry === 'Others' && !String(workspaceDetails.industryOther || '').trim()) {
         nextErrors.industryOther = 'Please specify your industry.'
@@ -275,6 +286,7 @@ function OnboardingExperience({
     onComplete({
       ...finalWorkspaceData,
       currency: resolvedCurrencyCode,
+      addressCountry: finalWorkspaceData.addressCountry || finalWorkspaceData.country || '',
       primaryContact: buildFullName(finalWorkspaceData),
     })
   }
@@ -283,7 +295,7 @@ function OnboardingExperience({
     <div className="min-h-screen bg-background px-4 py-8" style={{ fontFamily: "'Helvetica Now', 'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
       <div className="max-w-4xl mx-auto bg-white border border-border-light rounded-xl shadow-card p-8">
         <div className="flex items-center justify-center mb-6">
-          <KiaminaLogo className="h-12 w-auto" />
+          <KiaminaLogo className="h-32 w-auto" />
         </div>
 
         <div className="flex items-center justify-between mb-4">
@@ -438,6 +450,15 @@ function OnboardingExperience({
                   {errors.country && <p className="text-xs text-error mt-1">{errors.country}</p>}
                 </div>
 
+                <div className="md:col-span-2 rounded-md border border-border-light bg-background/50 px-3 py-2.5">
+                  <p className="text-xs uppercase tracking-wide text-text-muted">Registered Address</p>
+                  <p className="text-sm font-medium text-text-primary mt-1">
+                    {[workspaceDetails.address1, workspaceDetails.address2, workspaceDetails.city, workspaceDetails.postalCode, workspaceDetails.addressCountry]
+                      .filter(Boolean)
+                      .join(', ') || '--'}
+                  </p>
+                </div>
+
                 <div className="rounded-md border border-border-light bg-background/50 px-3 py-2.5">
                   <p className="text-xs uppercase tracking-wide text-text-muted">Industry</p>
                   <p className="text-sm font-medium text-text-primary mt-1">
@@ -537,6 +558,74 @@ function OnboardingExperience({
                     {INDUSTRY_OPTIONS.map((industry) => <option key={industry} value={industry}>{industry}</option>)}
                   </select>
                   {errors.industry && <p className="text-xs text-error mt-1">{errors.industry}</p>}
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-text-primary mb-1.5">Address Line 1</label>
+                  <input
+                    id="onboarding-address1"
+                    type="text"
+                    value={safeData.address1 || ''}
+                    onChange={(event) => updateField('address1', event.target.value)}
+                    placeholder="Street address"
+                    className={`w-full h-10 px-3 border rounded-md text-sm ${errors.address1 ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
+                  />
+                  {errors.address1 && <p className="text-xs text-error mt-1">{errors.address1}</p>}
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-text-primary mb-1.5">Address Line 2</label>
+                  <input
+                    id="onboarding-address2"
+                    type="text"
+                    value={safeData.address2 || ''}
+                    onChange={(event) => updateField('address2', event.target.value)}
+                    placeholder="Suite, floor, or landmark"
+                    className={`w-full h-10 px-3 border rounded-md text-sm ${errors.address2 ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
+                  />
+                  {errors.address2 && <p className="text-xs text-error mt-1">{errors.address2}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-1.5">City</label>
+                  <input
+                    id="onboarding-city"
+                    type="text"
+                    value={safeData.city || ''}
+                    onChange={(event) => updateField('city', event.target.value)}
+                    className={`w-full h-10 px-3 border rounded-md text-sm ${errors.city ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
+                  />
+                  {errors.city && <p className="text-xs text-error mt-1">{errors.city}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-primary mb-1.5">Postal Code</label>
+                  <input
+                    id="onboarding-postalCode"
+                    type="text"
+                    value={safeData.postalCode || ''}
+                    onChange={(event) => updateField('postalCode', event.target.value)}
+                    className={`w-full h-10 px-3 border rounded-md text-sm ${errors.postalCode ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
+                  />
+                  {errors.postalCode && <p className="text-xs text-error mt-1">{errors.postalCode}</p>}
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-text-primary mb-1.5">Address Country</label>
+                  <select
+                    id="onboarding-addressCountry"
+                    value={safeData.addressCountry || safeData.country || ''}
+                    onChange={(event) => updateField('addressCountry', event.target.value)}
+                    className={`w-full h-10 px-3 border rounded-md text-sm ${errors.addressCountry ? 'border-error' : 'border-border'} focus:outline-none focus:border-primary`}
+                  >
+                    <option value="">Select country</option>
+                    <option value="Nigeria">Nigeria</option>
+                    <option value="United States">United States</option>
+                    <option value="United Kingdom">United Kingdom</option>
+                    <option value="Canada">Canada</option>
+                    <option value="Australia">Australia</option>
+                  </select>
+                  {errors.addressCountry && <p className="text-xs text-error mt-1">{errors.addressCountry}</p>}
                 </div>
 
                 {safeData.industry === 'Others' && (

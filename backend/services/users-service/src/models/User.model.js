@@ -47,7 +47,7 @@ const onboardingSchema = new mongoose.Schema(
     currentStep: { type: Number, default: 1, min: 1 },
     completed: { type: Boolean, default: false },
     skipped: { type: Boolean, default: false },
-    verificationPending: { type: Boolean, default: true },
+    verificationPending: { type: Boolean, default: false },
     completedAt: { type: Date, default: null },
     skippedAt: { type: Date, default: null }
   },
@@ -184,7 +184,7 @@ const clientWorkspaceSchema = new mongoose.Schema(
         currentStep: 1,
         completed: false,
         skipped: false,
-        verificationPending: true,
+        verificationPending: false,
         data: {}
       })
     },

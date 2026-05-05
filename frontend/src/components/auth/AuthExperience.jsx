@@ -56,6 +56,44 @@ function maskEmail(email) {
   return `${value[0]}${'*'.repeat(Math.max(3, at - 1))}${value.slice(at)}`
 }
 
+function normalizeSocialPromptProfile(profile = {}) {
+  const source = profile && typeof profile === 'object' ? profile : {}
+  const fullName = String(source.fullName || source.displayName || '').trim()
+  const parts = fullName.split(/\s+/).filter(Boolean)
+  const firstName = String(source.firstName || parts[0] || '').trim()
+  const lastName = String(source.lastName || (parts.length > 1 ? parts[parts.length - 1] : '')).trim()
+  const otherNames = String(source.otherNames || (parts.length > 2 ? parts.slice(1, -1).join(' ') : '')).trim()
+
+  return {
+    firstName,
+    lastName,
+    otherNames,
+  }
+}
+
+function createEmptySocialPrompt() {
+  return {
+    open: false,
+    provider: '',
+    firstName: '',
+    lastName: '',
+    otherNames: '',
+    error: '',
+  }
+}
+
+function createSocialPromptState({ provider = 'google', profile = {} } = {}) {
+  const normalizedProfile = normalizeSocialPromptProfile(profile)
+  return {
+    open: true,
+    provider: String(provider || 'google').trim() || 'google',
+    firstName: normalizedProfile.firstName,
+    lastName: normalizedProfile.lastName,
+    otherNames: normalizedProfile.otherNames,
+    error: '',
+  }
+}
+
 function getPasswordStrength(password) {
   let score = 0
   if (password.length >= 8) score += 1
@@ -107,7 +145,7 @@ function OtpModal({ challenge, onVerifyOtp, onResendOtp, onCancelOtp }) {
   const refs = useRef([])
   const code = digits.join('')
   const deliveryStatusMessage = challenge?.deliveryError
-    ? 'We could not confirm delivery of the verification code. If it does not arrive, use Resend code.'
+    ? 'We could not confirm delivery of the verification code. Please request a new code if it does not arrive.'
     : ''
 
   const verify = async (override = '') => {
@@ -241,7 +279,7 @@ function AuthExperience({
   const [isVerificationResendLoading, setIsVerificationResendLoading] = useState(false)
   const [isVerificationApplying, setIsVerificationApplying] = useState(false)
   const [socialLoading, setSocialLoading] = useState('')
-  const [socialPrompt, setSocialPrompt] = useState({ open: false, provider: '', fullName: '', error: '' })
+  const [socialPrompt, setSocialPrompt] = useState(() => createEmptySocialPrompt())
   const actionCode = typeof window !== 'undefined' ? String(new URLSearchParams(window.location.search || '').get('oobCode') || '').trim() : ''
   const processedResetCodeRef = useRef('')
   const processedVerificationCodeRef = useRef('')
@@ -300,14 +338,12 @@ function AuthExperience({
   }, [actionCode, mode, onVerifyEmailAddress])
 
   useEffect(() => {
-    if (mode !== 'signup' || socialPrompt.open) return
+    if (!['login', 'signup'].includes(mode) || socialPrompt.open) return
     if (!pendingSocialPrompt || typeof pendingSocialPrompt !== 'object') return
-    setSocialPrompt({
-      open: true,
-      provider: String(pendingSocialPrompt.provider || 'google').trim() || 'google',
-      fullName: String(pendingSocialPrompt?.profile?.fullName || '').trim(),
-      error: '',
-    })
+    setSocialPrompt(createSocialPromptState({
+      provider: pendingSocialPrompt.provider,
+      profile: pendingSocialPrompt.profile,
+    }))
   }, [mode, pendingSocialPrompt, socialPrompt.open])
 
   useEffect(() => {
@@ -350,7 +386,12 @@ function AuthExperience({
       <button type="button" onClick={() => void (async () => {
         setSocialLoading('google')
         const result = await onSocialLogin('google')
-        if (result?.requiresProfileCompletion || result?.requiresFullName) setSocialPrompt({ open: true, provider: 'google', fullName: String(result?.profile?.fullName || '').trim(), error: '' })
+        if (result?.requiresProfileCompletion || result?.requiresFullName) {
+          setSocialPrompt(createSocialPromptState({
+            provider: result?.provider || 'google',
+            profile: result?.profile,
+          }))
+        }
         else if (!result?.ok) (mode === 'signup' ? setSignupError(result?.message || 'Authentication failed. Please try again.') : setLoginError(result?.message || 'Authentication failed. Please try again.'))
         setSocialLoading('')
       })()} disabled={Boolean(socialLoading)} className="flex h-12 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 disabled:opacity-60">
@@ -375,7 +416,7 @@ function AuthExperience({
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(21,53,133,0.16),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(21,53,133,0.12),transparent_42%)]" aria-hidden="true" />
       <div className={`relative w-full rounded-[32px] border border-slate-200 bg-white/95 shadow-[0_32px_90px_rgba(15,23,42,0.18)] ${mode === 'signup' ? 'max-w-3xl' : 'max-w-lg'}`}>
         <div className="border-b border-slate-200 px-8 pb-6 pt-8">
-          <div className="flex items-center justify-center"><KiaminaLogo className="h-12 w-auto" /></div>
+          <div className="flex items-center justify-center"><KiaminaLogo className="h-32 w-auto" /></div>
           <div className="mt-6 flex items-center justify-center gap-3 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef3ff] text-[#153585]"><Shield className="h-5 w-5" /></div>
             <div><p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Kiamina Client Portal</p><h1 className="mt-1 text-2xl font-semibold text-slate-900">{TITLES[mode]}</h1><p className="mt-2 text-sm text-slate-500">{DESCRIPTIONS[mode]}</p></div>
@@ -577,18 +618,34 @@ function AuthExperience({
       {socialPrompt.open ? (
         <div className="fixed inset-0 z-[225] flex items-center justify-center bg-slate-950/40 p-4">
           <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_30px_80px_rgba(15,23,42,0.24)]">
-            <h3 className="text-lg font-semibold text-slate-900">Complete Your Profile</h3>
-            <p className="mt-2 text-sm text-slate-500">Add your full name before continuing with Google authentication.</p>
-            <div className="mt-5"><Field label="Full Name" icon={Shield} error={socialPrompt.error}><input value={socialPrompt.fullName} onChange={(e) => setSocialPrompt((p) => ({ ...p, fullName: e.target.value, error: '' }))} placeholder="Enter your full name" className="h-full w-full bg-transparent text-sm outline-none placeholder:text-slate-400" /></Field></div>
+            <h3 className="text-lg font-semibold text-slate-900">Confirm Your Google Profile</h3>
+            <p className="mt-2 text-sm text-slate-500">Review the name from Google before continuing.</p>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <Field label="First Name" icon={Shield} error={socialPrompt.error && !socialPrompt.firstName ? socialPrompt.error : ''}>
+                <input value={socialPrompt.firstName} onChange={(e) => setSocialPrompt((p) => ({ ...p, firstName: e.target.value, error: '' }))} placeholder="First name" className="h-full w-full bg-transparent text-sm outline-none placeholder:text-slate-400" />
+              </Field>
+              <Field label="Last Name" icon={Shield} error={socialPrompt.error && !socialPrompt.lastName ? socialPrompt.error : ''}>
+                <input value={socialPrompt.lastName} onChange={(e) => setSocialPrompt((p) => ({ ...p, lastName: e.target.value, error: '' }))} placeholder="Last name" className="h-full w-full bg-transparent text-sm outline-none placeholder:text-slate-400" />
+              </Field>
+              <div className="sm:col-span-2">
+                <Field label="Other Name" icon={Shield}>
+                  <input value={socialPrompt.otherNames} onChange={(e) => setSocialPrompt((p) => ({ ...p, otherNames: e.target.value, error: '' }))} placeholder="Other name" className="h-full w-full bg-transparent text-sm outline-none placeholder:text-slate-400" />
+                </Field>
+              </div>
+            </div>
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => { setSocialPrompt({ open: false, provider: '', fullName: '', error: '' }); onCancelSocialNamePrompt?.() }} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">Cancel</button>
+              <button type="button" onClick={() => { setSocialPrompt(createEmptySocialPrompt()); onCancelSocialNamePrompt?.() }} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">Cancel</button>
               <button type="button" onClick={async () => {
-                const fullName = String(socialPrompt.fullName || '').trim()
-                if (!fullName) return setSocialPrompt((p) => ({ ...p, error: 'Please complete all required fields.' }))
-                const result = await onSocialLogin(socialPrompt.provider, fullName)
+                const firstName = String(socialPrompt.firstName || '').trim()
+                const lastName = String(socialPrompt.lastName || '').trim()
+                const otherNames = String(socialPrompt.otherNames || '').trim()
+                if (!firstName || !lastName) return setSocialPrompt((p) => ({ ...p, error: 'First and last name are required.' }))
+                setSocialLoading(socialPrompt.provider || 'google')
+                const result = await onSocialLogin(socialPrompt.provider, { firstName, lastName, otherNames })
+                setSocialLoading('')
                 if (!result?.ok) return setSocialPrompt((p) => ({ ...p, error: result?.message || 'Authentication failed. Please try again.' }))
-                setSocialPrompt({ open: false, provider: '', fullName: '', error: '' })
-              }} className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white" style={{ backgroundColor: BRAND_COLOR }}>Continue</button>
+                setSocialPrompt(createEmptySocialPrompt())
+              }} disabled={Boolean(socialLoading)} className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" style={{ backgroundColor: BRAND_COLOR }}>{socialLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Continue</button>
             </div>
           </div>
         </div>

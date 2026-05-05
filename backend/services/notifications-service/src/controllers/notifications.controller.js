@@ -6,6 +6,7 @@ import {
   updateNotificationStatus
 } from "../services/notifications.service.js";
 import { publishRealtimeEvent } from "../services/realtime-events.service.js";
+import { sendEmailViaSmtp } from "../services/smtp.service.js";
 import {
   getRequestActor,
   hasAnyAdminPermission,
@@ -13,9 +14,12 @@ import {
 } from "../utils/request-actor.js";
 import {
   buildNotificationLogUpdatePayload,
+  validateContactFormPayload,
   validatePatchStatusPayload,
   validateSendEmailPayload
 } from "../validation/notifications.validation.js";
+
+const CONTACT_FORM_RECIPIENT = "info@kiaminaaccounting.com";
 
 const requireActor = (req, res) => {
   const actor = getRequestActor(req);
@@ -64,6 +68,85 @@ const emitNotificationEvent = (eventPayload = {}) => {
     publishRealtimeEvent(eventPayload);
   } catch (error) {
     console.error("notifications realtime emit warning:", error.message);
+  }
+};
+
+const buildContactEmailSubject = ({ service = "", company = "", name = "" }) => {
+  const context = service || company || name;
+  return context
+    ? `Website contact form: ${context}`
+    : "Website contact form";
+};
+
+const buildContactEmailMessage = ({
+  name,
+  email,
+  company = "",
+  service = "",
+  message
+}) =>
+  [
+    "New website contact request",
+    "",
+    `Name: ${name}`,
+    `Email: ${email}`,
+    `Company: ${company || "Not provided"}`,
+    `Service: ${service || "Not selected"}`,
+    "",
+    "Message:",
+    message
+  ].join("\n");
+
+export const sendContactFormEmail = async (req, res, next) => {
+  try {
+    const { errors, payload } = validateContactFormPayload(req.body);
+    if (errors.length > 0) {
+      return res.status(400).json({ message: errors.join("; ") });
+    }
+
+    let result;
+    try {
+      result = await sendEmailViaSmtp({
+        to: CONTACT_FORM_RECIPIENT,
+        subject: buildContactEmailSubject(payload),
+        message: buildContactEmailMessage(payload),
+        replyTo: payload.email
+      });
+    } catch (error) {
+      console.error("contact form SMTP delivery failed:", {
+        to: CONTACT_FORM_RECIPIENT,
+        reason: error?.message || "smtp-send-error"
+      });
+      return res.status(503).json({
+        message: "Unable to send contact request right now.",
+        reason: "smtp-send-error"
+      });
+    }
+
+    console.info("contact form SMTP delivery result:", {
+      to: CONTACT_FORM_RECIPIENT,
+      sent: Boolean(result.sent),
+      provider: result.provider || "smtp",
+      reason: result.reason || "",
+      messageId: result.messageId || "",
+      accepted: result.accepted || [],
+      rejected: result.rejected || [],
+      response: result.response || ""
+    });
+
+    if (!result.sent) {
+      return res.status(503).json({
+        message: "Unable to send contact request right now.",
+        reason: result.reason || "smtp-send-failed"
+      });
+    }
+
+    return res.status(202).json({
+      message: "Contact request sent.",
+      providerMessageId: result.messageId || ""
+    });
+  } catch (error) {
+    return next(error);
   }
 };
 

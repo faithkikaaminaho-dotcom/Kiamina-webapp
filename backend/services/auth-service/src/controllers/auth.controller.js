@@ -727,12 +727,30 @@ export const getSocialAuthAccountStatus = async (req, res, next) => {
     const account = await getRegisteredAuthAccountByEmail(normalizedEmail);
     const requestedProvider = String(payload.provider || "google").trim().toLowerCase();
     const registeredProvider = String(account?.provider || "").trim().toLowerCase();
-    const matchesProvider = Boolean(account && registeredProvider === requestedProvider);
+    const registeredProviders = Array.isArray(account?.providers)
+      ? account.providers.map((provider) => String(provider || "").trim().toLowerCase()).filter(Boolean)
+      : [];
+    const hasPassword = Boolean(
+      account?.hasPassword
+      || registeredProvider === "email-password"
+      || registeredProviders.includes("email-password")
+    );
+    const matchesProvider = Boolean(
+      account
+      && (
+        registeredProvider === requestedProvider
+        || registeredProviders.includes(requestedProvider)
+        || (requestedProvider === "email-password" && hasPassword)
+      )
+    );
 
     return res.status(200).json({
       email: normalizedEmail,
       exists: Boolean(account),
+      accountExists: Boolean(account),
       provider: registeredProvider,
+      providers: registeredProviders,
+      hasPassword,
       role: String(account?.role || "").trim().toLowerCase(),
       status: String(account?.status || "").trim().toLowerCase(),
       emailVerified: Boolean(account?.emailVerified),
@@ -872,6 +890,8 @@ export const registerAccount = async (req, res, next) => {
         fullName: result.account.fullName,
         role: result.account.role,
         provider: result.account.provider,
+        providers: Array.isArray(result.account.providers) ? result.account.providers : [],
+        hasPassword: Boolean(result.account.hasPassword),
         status: result.account.status,
         emailVerified: Boolean(result.account.emailVerified),
         phoneVerified: Boolean(result.account.phoneVerified),

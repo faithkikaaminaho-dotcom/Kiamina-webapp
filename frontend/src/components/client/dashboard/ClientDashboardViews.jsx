@@ -547,7 +547,7 @@ function Sidebar({
           className="inline-flex items-center"
           title="Go to Dashboard Overview"
         >
-          <KiaminaLogo className="h-11 w-auto" />
+          <KiaminaLogo className="h-28 w-auto" />
         </button>
         <button
           type="button"
@@ -856,41 +856,12 @@ function TopBar({
 function DashboardPage({
   onAddDocument,
   setActivePage,
-  verificationState = 'pending',
   records = [],
   activityLogs = [],
   documentSummary = null,
   isLoading = false,
   showSlowNetworkOverlay = false,
 }) {
-  const verificationBadgeConfig = {
-    verified: {
-      label: 'Verified',
-      icon: CheckCircle,
-      className: 'bg-primary-tint text-primary border border-primary/30',
-    },
-    unverified: {
-      label: 'Unverified',
-      icon: AlertCircle,
-      className: 'bg-error-bg text-error border border-error/30',
-    },
-    pending: {
-      label: 'Verification Pending',
-      icon: Clock,
-      className: 'bg-warning-bg text-warning border border-warning/30',
-    },
-    rejected: {
-      label: 'Verification Rejected',
-      icon: XCircle,
-      className: 'bg-error-bg text-error border border-error/30',
-    },
-    suspended: {
-      label: 'Account Suspended',
-      icon: Shield,
-      className: 'bg-error-bg text-error border border-error/30',
-    },
-  }
-  const activeVerificationBadge = verificationBadgeConfig[verificationState] || verificationBadgeConfig.pending
   const parseDateValue = (value = '') => {
     const parsed = Date.parse(value)
     return Number.isFinite(parsed) ? parsed : 0
@@ -909,26 +880,39 @@ function DashboardPage({
   )
   const summaryStatus = hasDocumentSummary ? documentSummary.statusCounts : {}
   const summaryCategory = hasDocumentSummary ? documentSummary.categoryCounts : {}
+  const localApprovedCount = sortedRecords.filter((record) => record.status === 'Approved').length
+  const localPendingCount = sortedRecords.filter((record) => record.status === 'Pending Review').length
+  const localRejectedCount = sortedRecords.filter((record) => record.status === 'Rejected').length
+  const localExpenseFiles = sortedRecords.filter((record) => record.categoryId === 'expenses' || record.category === 'Expense').length
+  const localSalesFiles = sortedRecords.filter((record) => record.categoryId === 'sales' || record.category === 'Sales').length
+  const localBankFiles = sortedRecords.filter((record) => (
+    record.categoryId === 'bank-statements'
+    || record.category === 'Bank Statement'
+    || record.category === 'Bank'
+  )).length
 
-  // derive counts from backend summary when available, otherwise from local files
+  // Prefer whichever source reflects more real data so stale backend summaries do not zero out the cards.
   const approvedCount = hasDocumentSummary
-    ? Number(documentSummary.approvedDocuments ?? summaryStatus.ready ?? 0)
-    : sortedRecords.filter(r => r.status === 'Approved').length
+    ? Math.max(localApprovedCount, Number(documentSummary.approvedDocuments ?? summaryStatus.ready ?? 0))
+    : localApprovedCount
   const pendingCount = hasDocumentSummary
-    ? Number(documentSummary.pendingDocuments ?? ((summaryStatus.processing || 0) + (summaryStatus.toReview || 0) + (summaryStatus.infoRequested || 0)))
-    : sortedRecords.filter(r => r.status === 'Pending Review').length
+    ? Math.max(
+      localPendingCount,
+      Number(documentSummary.pendingDocuments ?? ((summaryStatus.processing || 0) + (summaryStatus.toReview || 0) + (summaryStatus.infoRequested || 0))),
+    )
+    : localPendingCount
   const rejectedCount = hasDocumentSummary
-    ? Number(documentSummary.rejectedDocuments ?? summaryStatus.rejected ?? 0)
-    : sortedRecords.filter(r => r.status === 'Rejected').length
+    ? Math.max(localRejectedCount, Number(documentSummary.rejectedDocuments ?? summaryStatus.rejected ?? 0))
+    : localRejectedCount
   const totalExpenseFiles = hasDocumentSummary
-    ? Number(summaryCategory.expenses || 0)
-    : sortedRecords.filter(r => r.categoryId === 'expenses' || r.category === 'Expense').length
+    ? Math.max(localExpenseFiles, Number(summaryCategory.expenses || 0))
+    : localExpenseFiles
   const totalSalesFiles = hasDocumentSummary
-    ? Number(summaryCategory.sales || 0)
-    : sortedRecords.filter(r => r.categoryId === 'sales' || r.category === 'Sales').length
+    ? Math.max(localSalesFiles, Number(summaryCategory.sales || 0))
+    : localSalesFiles
   const totalBankFiles = hasDocumentSummary
-    ? Number(summaryCategory.bankStatements || 0)
-    : sortedRecords.filter(r => r.categoryId === 'bank-statements' || r.category === 'Bank Statement' || r.category === 'Bank').length
+    ? Math.max(localBankFiles, Number(summaryCategory.bankStatements || 0))
+    : localBankFiles
 
   // Activity Timeline
   const formatActivityTimestamp = (value = '') => {
@@ -1100,10 +1084,6 @@ function DashboardPage({
           <div>
             <h1 className="text-xl font-semibold text-text-primary">Dashboard Overview</h1>
             <p className="text-sm text-text-secondary mt-1">Your current document and activity snapshot.</p>
-            <div className={`mt-2 inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-xs font-medium ${activeVerificationBadge.className}`}>
-              <activeVerificationBadge.icon className="w-3.5 h-3.5" />
-              {activeVerificationBadge.label}
-            </div>
           </div>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto sm:justify-end">
