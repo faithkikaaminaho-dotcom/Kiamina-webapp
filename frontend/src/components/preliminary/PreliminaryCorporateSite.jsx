@@ -148,6 +148,26 @@ const CALENDAR_BOOKING_URL = 'https://calendar.app.google/Ph7DtaeNiKSBq7B69'
 const CONTACT_CONSULTATION_CALENDAR_ID = 'contact-consultation-calendar'
 const WEBSITE_ANALYTICS_SESSION_STORAGE_KEY = 'kiaminaWebsiteAnalyticsSessionId'
 const REGION_DETECTION_TIMEOUT_MS = 2200
+const FOOTER_STATEMENTS = {
+  privacy: {
+    title: 'Privacy Statement',
+    body: [
+      'Kiamina Accounting Services collects only the personal and business information needed to respond to enquiries, deliver services, and maintain secure client relationships.',
+      'We use submitted information for communication, service onboarding, reporting support, compliance workflows, and operational improvement. We do not sell client information.',
+      'Information is shared only with trusted service providers and regulators where required for service delivery, lawful compliance, security, or fraud prevention.',
+      'You may request correction or deletion of information that is no longer required for legal, regulatory, or service obligations by contacting info@kiaminaaccounting.com.',
+    ],
+  },
+  legal: {
+    title: 'Legal Statement',
+    body: [
+      'Kiamina Accounting Services provides accounting, advisory, payroll, reporting, and related professional support based on the scope agreed with each client.',
+      'Information shared on this website is general in nature and should not be treated as a substitute for tailored legal, tax, audit, or regulatory advice.',
+      'Engagement terms, timelines, deliverables, confidentiality expectations, and professional responsibilities are governed by the specific agreement signed with each client.',
+      'By using this website or submitting an enquiry, you acknowledge that Kiamina may review your request, contact you, and determine the appropriate next step before a formal engagement begins.',
+    ],
+  },
+}
 
 const SERVICES = [
   {
@@ -749,6 +769,7 @@ function PreliminaryCorporateSite({
   const [newsletterForm, setNewsletterForm] = useState({ fullName: '', email: '' })
   const [newsletterStatus, setNewsletterStatus] = useState('idle')
   const [newsletterMessage, setNewsletterMessage] = useState('')
+  const [activeFooterStatement, setActiveFooterStatement] = useState('')
   const [contactForm, setContactForm] = useState({
     name: '',
     email: '',
@@ -784,6 +805,19 @@ function PreliminaryCorporateSite({
     setMobileOpen(false)
     setRegionsOpen(false)
   }, [activePage])
+
+  useEffect(() => {
+    if (!activeFooterStatement || typeof window === 'undefined') return undefined
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setActiveFooterStatement('')
+      }
+    }
+
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [activeFooterStatement])
 
   useEffect(() => {
     const handleScroll = () => {
@@ -1965,7 +1999,7 @@ function PreliminaryCorporateSite({
   )
 
   const renderFooter = () => (
-    <footer className="border-t border-[#D9E3F4] bg-white">
+      <footer className="border-t border-[#D9E3F4] bg-white">
       <div className="mx-auto grid max-w-7xl gap-8 px-6 py-12 lg:grid-cols-[1fr_auto] lg:px-8">
         <div>
           <div className="text-sm font-semibold uppercase tracking-[0.24em] text-[#073D7F]">
@@ -1974,14 +2008,30 @@ function PreliminaryCorporateSite({
           <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600">
             Nigeria-based accounting and advisory firm providing structured financial operations, reporting clarity, and strategic support to clients across Nigeria, Canada, United States, United Kingdom, Australia, and Ireland.
           </p>
-          <div className="mt-6">
-            <div className="text-sm font-semibold uppercase tracking-[0.20em] text-[#073D7F]">Follow us</div>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              {SOCIAL_LINKS.map((social) => <SocialBadge key={social.name} href={social.href} name={social.name} />)}
+            <div className="mt-6">
+              <div className="text-sm font-semibold uppercase tracking-[0.20em] text-[#073D7F]">Follow us</div>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                {SOCIAL_LINKS.map((social) => <SocialBadge key={social.name} href={social.href} name={social.name} />)}
+              </div>
+              <div className="mt-2 text-xs text-slate-500">Stay connected for insights and updates</div>
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setActiveFooterStatement('privacy')}
+                  className="inline-flex items-center rounded-full border border-[#D9E3F4] bg-white px-4 py-2 text-sm font-semibold text-[#073D7F] transition hover:border-[#6491DE] hover:text-[#6491DE]"
+                >
+                  Privacy Statement
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveFooterStatement('legal')}
+                  className="inline-flex items-center rounded-full border border-[#D9E3F4] bg-white px-4 py-2 text-sm font-semibold text-[#073D7F] transition hover:border-[#6491DE] hover:text-[#6491DE]"
+                >
+                  Legal Statement
+                </button>
+              </div>
             </div>
-            <div className="mt-2 text-xs text-slate-500">Stay connected for insights and updates</div>
           </div>
-        </div>
         <div className="space-y-3 text-sm text-slate-600">
           <div className="flex items-start gap-3">
             <Mail className="mt-1 h-4 w-4 text-[#6491DE]" />
@@ -2016,7 +2066,40 @@ function PreliminaryCorporateSite({
         </div>
       </div>
     </footer>
-  )
+    )
+
+  const renderFooterStatementModal = () => {
+    const statement = FOOTER_STATEMENTS[activeFooterStatement]
+    if (!statement) return null
+
+    return (
+      <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 px-4 py-8" role="dialog" aria-modal="true" aria-labelledby="footer-statement-title">
+        <div className="w-full max-w-2xl rounded-[2rem] bg-white p-6 shadow-[0_30px_90px_rgba(15,23,42,0.22)] sm:p-8">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.20em] text-[#6491DE]">Kiamina policy</div>
+              <h3 id="footer-statement-title" className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+                {statement.title}
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveFooterStatement('')}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-slate-300 hover:text-slate-900"
+              aria-label="Close statement"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="mt-6 space-y-4 text-sm leading-7 text-slate-600">
+            {statement.body.map((paragraph) => (
+              <p key={paragraph}>{paragraph}</p>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const pageRenderer = {
     home: renderHomePage,
@@ -2288,6 +2371,7 @@ function PreliminaryCorporateSite({
       )}
 
       <ClientSupportWidgetExperience clientName="Website Visitor" businessName="Website Inquiry" />
+      {renderFooterStatementModal()}
 
       <div className="fixed bottom-5 right-5 z-40 hidden flex-col gap-3 lg:flex">
         {SOCIAL_LINKS.map((social) => <SocialBadge key={social.name} href={social.href} name={social.name} />)}
