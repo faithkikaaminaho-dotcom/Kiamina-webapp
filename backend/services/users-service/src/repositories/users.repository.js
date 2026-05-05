@@ -70,7 +70,6 @@ export const findUserByClientPhone = async ({
   }
   if (variants.length > 0) {
     filters.push({ "clientProfile.phone": { $in: variants } });
-    filters.push({ "clientWorkspace.settingsProfile.phone": { $in: variants } });
     filters.push({ "clientWorkspace.accountSettings.verifiedPhoneNumber": { $in: variants } });
   }
 

@@ -2151,9 +2151,17 @@ function PreliminaryCorporateSite({
           <button
             type="button"
             onClick={() => setMobileOpen((prev) => !prev)}
-            className="inline-flex rounded-2xl border border-slate-200/90 bg-white/95 p-2.5 text-slate-700 shadow-[0_12px_32px_rgba(15,23,42,0.08)] backdrop-blur xl:hidden"
+            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200/90 bg-white/95 px-3 py-2.5 text-slate-700 shadow-[0_12px_32px_rgba(15,23,42,0.08)] backdrop-blur xl:hidden"
             aria-label="Toggle menu"
           >
+            <BrandImage
+              src={selectedRegion.flag}
+              alt={getRegionFlagAlt({
+                isResolved: isRegionResolved,
+                regionLabel: selectedRegion.label,
+              })}
+              className="h-4 w-6 rounded-sm border border-slate-200"
+            />
             {mobileOpen ? <X className="h-5 w-5" strokeWidth={2.1} /> : <Rows3 className="h-5 w-5" strokeWidth={2.1} />}
           </button>
         </div>
@@ -2161,6 +2169,68 @@ function PreliminaryCorporateSite({
         {mobileOpen && (
           <div className="border-t border-slate-200 bg-white xl:hidden">
             <div className="mx-auto grid w-[min(1160px,92vw)] gap-1 py-3">
+              <div className="mb-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-2">
+                <button
+                  type="button"
+                  onClick={() => setRegionsOpen((prev) => !prev)}
+                  aria-label={getLocationDetectionAriaLabel({
+                    isResolved: isRegionResolved,
+                    regionLabel: selectedRegion.label,
+                  })}
+                  className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-700 transition-colors hover:bg-white"
+                >
+                  <span className="inline-flex items-center gap-3">
+                    <BrandImage
+                      src={selectedRegion.flag}
+                      alt={getRegionFlagAlt({
+                        isResolved: isRegionResolved,
+                        regionLabel: selectedRegion.label,
+                      })}
+                      className="h-4 w-6 rounded-sm border border-slate-200"
+                    />
+                    <span>
+                      {getLocationDetectionLabel({
+                        isResolved: isRegionResolved,
+                        regionLabel: selectedRegion.label,
+                      })}
+                    </span>
+                  </span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${regionsOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {regionsOpen && (
+                  <div className="mt-2 grid gap-1">
+                    {REGION_ITEMS.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          manualRegionSelectionRef.current = true
+                          setSelectedRegionId(item.id)
+                          setIsRegionResolved(true)
+                          trackWebsiteEvent({
+                            eventType: 'region_select',
+                            page: resolvedPage,
+                            targetType: 'region',
+                            targetId: item.id,
+                            targetLabel: item.label,
+                            metadata: getManualRegionSelectionMetadata(item),
+                          })
+                          setRegionsOpen(false)
+                          handleNavigate('contact')
+                        }}
+                        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                          selectedRegion.id === item.id
+                            ? 'bg-[#153585]/10 text-[#153585]'
+                            : 'text-slate-600 hover:bg-white hover:text-[#153585]'
+                        }`}
+                      >
+                        <BrandImage src={item.flag} alt={`${item.label} flag`} className="h-4 w-6 rounded-sm border border-slate-200" />
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               {NAV_ITEMS.map((item) => (
                 <button
                   key={item.id}
