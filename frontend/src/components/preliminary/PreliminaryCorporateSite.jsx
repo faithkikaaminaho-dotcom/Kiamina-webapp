@@ -150,6 +150,8 @@ const CALENDAR_BOOKING_URL = 'https://calendar.app.google/Ph7DtaeNiKSBq7B69'
 const CONTACT_CONSULTATION_CALENDAR_ID = 'contact-consultation-calendar'
 const WEBSITE_ANALYTICS_SESSION_STORAGE_KEY = 'kiaminaWebsiteAnalyticsSessionId'
 const REGION_DETECTION_TIMEOUT_MS = 2200
+const WHATSAPP_CONTACT_NUMBER = '2349064962073'
+const WHATSAPP_CONTACT_MESSAGE = 'Hello Kiamina Accounting Services, I would like to make an enquiry.'
 const AUXILIARY_PAGE_IDS = ['privacy', 'legal']
 
 const SERVICES = [
@@ -1032,6 +1034,12 @@ function PreliminaryCorporateSite({
         .getElementById(CONTACT_CONSULTATION_CALENDAR_ID)
         ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
+  }
+
+  const handleOpenWhatsAppContact = () => {
+    if (typeof window === 'undefined') return
+    const url = `https://wa.me/${WHATSAPP_CONTACT_NUMBER}?text=${encodeURIComponent(WHATSAPP_CONTACT_MESSAGE)}`
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   const submitNewsletter = async (event) => {
@@ -2023,18 +2031,22 @@ function PreliminaryCorporateSite({
       <div className="border-t border-[#D9E3F4]">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-5 text-xs text-slate-500 lg:px-8">
           <p>&copy; {new Date().getFullYear()} Kiamina Accounting Services. All rights reserved.</p>
-          <div className="flex flex-wrap items-center gap-4">
-            <button type="button" onClick={() => handleNavigate('about')} className="text-[#073D7F] transition hover:text-[#6491DE]">About</button>
-            <button type="button" onClick={() => handleNavigate('services')} className="text-[#073D7F] transition hover:text-[#6491DE]">Services</button>
-            <button type="button" onClick={() => handleNavigate('insights')} className="text-[#073D7F] transition hover:text-[#6491DE]">Insights</button>
-            <button type="button" onClick={() => handleNavigate('contact')} className="text-[#073D7F] transition hover:text-[#6491DE]">Contact</button>
-            <button type="button" onClick={onOpenAdminPortal} className="rounded-full border border-[#D9E3F4] px-3 py-1.5 font-semibold text-[#073D7F] hover:bg-[#F1F1F1]">
-              Admin Portal
-            </button>
+            <div className="flex flex-wrap items-center gap-4">
+              <button type="button" onClick={() => handleNavigate('about')} className="text-[#073D7F] transition hover:text-[#6491DE]">About</button>
+              <button type="button" onClick={() => handleNavigate('services')} className="text-[#073D7F] transition hover:text-[#6491DE]">Services</button>
+              <button type="button" onClick={() => handleNavigate('insights')} className="text-[#073D7F] transition hover:text-[#6491DE]">Insights</button>
+              <button type="button" onClick={() => handleNavigate('contact')} className="text-[#073D7F] transition hover:text-[#6491DE]">Contact</button>
+              <button
+                type="button"
+                onClick={handleOpenWhatsAppContact}
+                className="rounded-full border border-[#D9E3F4] px-3 py-1.5 font-semibold text-[#073D7F] transition hover:bg-[#F1F1F1] hover:text-[#25D366]"
+              >
+                WhatsApp Contact
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    </footer>
+      </footer>
     )
 
   const pageRenderer = {
