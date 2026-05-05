@@ -93,7 +93,7 @@ import PreliminaryCorporateSite from './components/preliminary/PreliminaryCorpor
 const CLIENT_PAGE_IDS = ['dashboard', 'expenses', 'sales', 'bank-statements', 'upload-history', 'resolved-documents', 'recent-activities', 'support', 'settings']
 const CLIENT_DOCUMENT_PAGE_IDS = ['expenses', 'sales', 'bank-statements']
 const APP_PAGE_IDS = [...CLIENT_PAGE_IDS, ...ADMIN_PAGE_IDS]
-const PUBLIC_SITE_PAGE_IDS = ['home', 'about', 'services', 'insights', 'careers', 'contact']
+const PUBLIC_SITE_PAGE_IDS = ['home', 'about', 'services', 'insights', 'careers', 'contact', 'privacy', 'legal']
 const PUBLIC_SITE_PAGE_BY_PATH = {
   '/': 'home',
   '/home': 'home',
@@ -102,6 +102,8 @@ const PUBLIC_SITE_PAGE_BY_PATH = {
   '/insights': 'insights',
   '/careers': 'careers',
   '/contact': 'contact',
+  '/privacy': 'privacy',
+  '/legal': 'legal',
 }
 const normalizeAppPathname = (pathname = '/') => {
   const rawPath = String(pathname || '/').trim() || '/'
