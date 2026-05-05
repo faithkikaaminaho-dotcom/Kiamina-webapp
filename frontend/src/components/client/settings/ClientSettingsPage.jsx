@@ -1526,11 +1526,15 @@ function SettingsPage({
     return true
   }
 
-  const handleSaveProfile = async () => {
+  const handleSaveProfile = async (event) => {
+    event?.preventDefault?.()
+    event?.stopPropagation?.()
     await saveSection('user-profile', validateProfile, ['firstName', 'lastName', 'otherNames', 'email'])
   }
 
-  const handleSaveNotifications = () => {
+  const handleSaveNotifications = (event) => {
+    event?.preventDefault?.()
+    event?.stopPropagation?.()
     const normalized = persistClientNotificationSettings(clientEmail || '', notificationDraft)
     setNotifications(normalized)
     setNotificationDraft(normalized)
@@ -1645,7 +1649,9 @@ function SettingsPage({
   })
   */
 
-  const handleSaveBusiness = async () => {
+  const handleSaveBusiness = async (event) => {
+    event?.preventDefault?.()
+    event?.stopPropagation?.()
     const requiresRegistrationNumber = draftData.businessType === 'Business' || draftData.businessType === 'Non-Profit'
     const lockableFields = requiresRegistrationNumber ? ['cacNumber', 'businessName'] : ['businessName']
     const didSave = await saveSection('business-profile', validateBusiness, lockableFields)
@@ -1667,11 +1673,15 @@ function SettingsPage({
     }
   }
 
-  const handleSaveTax = async () => {
+  const handleSaveTax = async (event) => {
+    event?.preventDefault?.()
+    event?.stopPropagation?.()
     await saveSection('tax-details', validateTax, ['tin'])
   }
 
-  const handleSaveAddress = async () => {
+  const handleSaveAddress = async (event) => {
+    event?.preventDefault?.()
+    event?.stopPropagation?.()
     await saveSection('registered-address', validateAddress)
   }
 
@@ -2535,6 +2545,7 @@ function SettingsPage({
 
                 <div className="pt-4">
                   <button
+                    type="button"
                     onClick={handleSaveProfile}
                     className="h-10 px-6 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-light transition-colors"
                   >
@@ -3224,6 +3235,7 @@ function SettingsPage({
 
                 <div className="pt-4">
                   <button
+                    type="button"
                     onClick={handleSaveBusiness}
                     className="h-10 px-6 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-light transition-colors"
                   >
@@ -3342,6 +3354,7 @@ function SettingsPage({
 
                 <div className="pt-4">
                   <button
+                    type="button"
                     onClick={handleSaveTax}
                     className="h-10 px-6 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-light transition-colors"
                   >
@@ -3445,6 +3458,7 @@ function SettingsPage({
 
                 <div className="pt-4">
                   <button
+                    type="button"
                     onClick={handleSaveAddress}
                     className="h-10 px-6 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-light transition-colors"
                   >
