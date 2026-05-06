@@ -6398,7 +6398,7 @@ function App() {
     }
 
     const phoneAvailability = await checkClientPhoneAvailability(normalizedPhoneNumber)
-    if (!phoneAvailability.ok || !phoneAvailability.available) {
+    if (phoneAvailability.ok && !phoneAvailability.available) {
       return {
         ok: false,
         message: phoneAvailability.message || 'This phone number is already assigned to another account.',
