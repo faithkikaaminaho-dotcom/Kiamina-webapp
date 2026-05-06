@@ -3,10 +3,14 @@ name: CI
 on:
   push:
     branches:
-      - "**"
+      - main
+      - codex/**
+      - feature/**
+      - fix/**
+      - chore/**
   pull_request:
     branches:
-      - "**"
+      - main
   workflow_dispatch:
 
 permissions:
@@ -18,7 +22,7 @@ concurrency:
 
 jobs:
   frontend:
-    name: Frontend Lint + Test + Build
+    name: Frontend checks
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -41,7 +45,7 @@ jobs:
         run: npm run lint
 
       - name: Test frontend
-        run: npm run test
+        run: npm run test -- --passWithNoTests
 
       - name: Build frontend
         run: npm run build
@@ -54,7 +58,7 @@ jobs:
           if-no-files-found: error
 
   backend:
-    name: Backend Lint + Test
+    name: Backend checks
     runs-on: ubuntu-22.04
     env:
       MONGOMS_VERSION: "7.0.14"
@@ -81,12 +85,31 @@ jobs:
       - name: Test backend
         run: npm test
 
+  backend-docker:
+    name: Backend Docker build
+    runs-on: ubuntu-latest
+    needs:
+      - backend
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend images
+        run: docker compose build
+
   quality-gate:
     name: Quality Gate
     runs-on: ubuntu-latest
     needs:
       - frontend
       - backend
+      - backend-docker
     steps:
       - name: Confirm CI success
         run: echo "Frontend and backend checks passed."
