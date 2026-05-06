@@ -37,6 +37,26 @@ const DESCRIPTIONS = {
   'reset-password': 'Create a new password for your client portal.',
   'email-verification': 'Confirm your email address to activate your Kiamina account.',
 }
+const SIGNUP_POLICY_COPY = {
+  legal: {
+    title: 'Terms of Service',
+    sections: [
+      'By creating an account, you agree to use the Kiamina platform only for lawful business and financial activities.',
+      'Information on the platform supports accounting operations, but it does not replace tailored legal, tax, or regulatory advice.',
+      'Client service obligations, delivery scope, confidentiality, and timelines are governed by the engagement agreed with Kiamina.',
+      'If you do not agree with these terms, you should not continue with account registration.',
+    ],
+  },
+  privacy: {
+    title: 'Privacy Policy',
+    sections: [
+      'Kiamina collects the personal and business information needed to onboard clients, deliver services, and maintain secure communication.',
+      'Submitted data may be used for account administration, support, compliance, service improvement, and operational reporting.',
+      'We do not sell personal information. Data is shared only where necessary for service delivery, lawful obligations, or approved service providers.',
+      'You may decline consent and stop registration, or contact Kiamina later about how your information is handled.',
+    ],
+  },
+}
 
 function GoogleBrandIcon() {
   return (
@@ -117,6 +137,39 @@ function Notice({ type = 'error', message = '' }) {
     <div className={`flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm ${classes}`}>
       {type === 'success' ? <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0" /> : <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />}
       <span>{message}</span>
+    </div>
+  )
+}
+
+function PolicyModal({ type = 'legal', onAgree, onDecline }) {
+  const copy = SIGNUP_POLICY_COPY[type] || SIGNUP_POLICY_COPY.legal
+
+  return (
+    <div className="fixed inset-0 z-[228] flex items-center justify-center bg-slate-950/45 p-4">
+      <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_30px_80px_rgba(15,23,42,0.24)]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold uppercase tracking-[0.18em] text-[#153585]">Account agreement</div>
+            <h3 className="mt-3 text-2xl font-semibold text-slate-900">{copy.title}</h3>
+          </div>
+          <button type="button" onClick={onDecline} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+            Close
+          </button>
+        </div>
+        <div className="mt-6 space-y-4 text-sm leading-7 text-slate-600">
+          {copy.sections.map((section) => (
+            <p key={section}>{section}</p>
+          ))}
+        </div>
+        <div className="mt-8 flex flex-wrap items-center justify-end gap-3">
+          <button type="button" onClick={onDecline} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+            No
+          </button>
+          <button type="button" onClick={onAgree} className="rounded-xl px-4 py-2 text-sm font-semibold text-white" style={{ backgroundColor: BRAND_COLOR }}>
+            Agree
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -280,6 +333,7 @@ function AuthExperience({
   const [isVerificationApplying, setIsVerificationApplying] = useState(false)
   const [socialLoading, setSocialLoading] = useState('')
   const [socialPrompt, setSocialPrompt] = useState(() => createEmptySocialPrompt())
+  const [activePolicyModal, setActivePolicyModal] = useState('')
   const actionCode = typeof window !== 'undefined' ? String(new URLSearchParams(window.location.search || '').get('oobCode') || '').trim() : ''
   const processedResetCodeRef = useRef('')
   const processedVerificationCodeRef = useRef('')
@@ -378,7 +432,26 @@ function AuthExperience({
     setForgotFeedback(null)
     setResetFeedback(null)
     setVerificationFeedback(null)
+    setActivePolicyModal('')
     setMode(nextMode)
+  }
+
+  const handleOpenPolicyModal = (type) => {
+    setSignupError('')
+    setSignupFieldErrors((previous) => ({ ...previous, agree: '' }))
+    setActivePolicyModal(type === 'privacy' ? 'privacy' : 'legal')
+  }
+
+  const handleAgreeToPolicy = () => {
+    setSignupError('')
+    setSignupFieldErrors((previous) => ({ ...previous, agree: '' }))
+    setSignupForm((previous) => ({ ...previous, agree: true }))
+    setActivePolicyModal('')
+  }
+
+  const handleDeclinePolicy = () => {
+    setSignupForm((previous) => ({ ...previous, agree: false }))
+    setActivePolicyModal('')
   }
 
   const socialBlock = (mode === 'login' || (mode === 'signup' && !isInviteSignup)) ? (
@@ -533,7 +606,49 @@ function AuthExperience({
                   <Field label="Confirm Password" icon={Lock} error={signupFieldErrors.confirmPassword} required><input type={showSignupPassword ? 'text' : 'password'} value={signupForm.confirmPassword} onChange={(e) => { setSignupError(''); setSignupFieldErrors((previous) => ({ ...previous, confirmPassword: '' })); setSignupForm((p) => ({ ...p, confirmPassword: e.target.value })) }} placeholder="Confirm your password" className="h-full w-full bg-transparent text-sm outline-none placeholder:text-slate-400" /></Field>
                 </div>
                 <div className="space-y-2">
-                  <label className={`inline-flex items-start gap-3 rounded-2xl border bg-slate-50 px-4 py-4 text-sm text-slate-600 ${signupFieldErrors.agree ? 'border-red-300' : 'border-slate-200'}`}><input type="checkbox" checked={signupForm.agree} onChange={(e) => { setSignupError(''); setSignupFieldErrors((previous) => ({ ...previous, agree: '' })); setSignupForm((p) => ({ ...p, agree: e.target.checked })) }} className="mt-0.5 h-4 w-4 accent-[#153585]" /><span>I agree to the <a href="/legal" target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="font-semibold text-[#153585] underline underline-offset-2">Terms of Service</a> and <a href="/privacy" target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="font-semibold text-[#153585] underline underline-offset-2">Privacy Policy</a> <span className="text-red-500">*</span></span></label>
+                  <label className={`inline-flex items-start gap-3 rounded-2xl border bg-slate-50 px-4 py-4 text-sm text-slate-600 ${signupFieldErrors.agree ? 'border-red-300' : 'border-slate-200'}`}>
+                    <input
+                      type="checkbox"
+                      checked={signupForm.agree}
+                      onChange={(event) => {
+                        if (event.target.checked) {
+                          handleOpenPolicyModal('legal')
+                          return
+                        }
+                        setSignupError('')
+                        setSignupFieldErrors((previous) => ({ ...previous, agree: '' }))
+                        setSignupForm((previous) => ({ ...previous, agree: false }))
+                      }}
+                      className="mt-0.5 h-4 w-4 accent-[#153585]"
+                    />
+                    <span>
+                      I agree to the{' '}
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          handleOpenPolicyModal('legal')
+                        }}
+                        className="font-semibold text-[#153585] underline underline-offset-2"
+                      >
+                        Terms of Service
+                      </button>{' '}
+                      and{' '}
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault()
+                          event.stopPropagation()
+                          handleOpenPolicyModal('privacy')
+                        }}
+                        className="font-semibold text-[#153585] underline underline-offset-2"
+                      >
+                        Privacy Policy
+                      </button>{' '}
+                      <span className="text-red-500">*</span>
+                    </span>
+                  </label>
                   {signupFieldErrors.agree ? <p className="text-xs font-medium text-red-600">{signupFieldErrors.agree}</p> : null}
                 </div>
                 <button type="submit" disabled={isSignupLoading} className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold text-white disabled:opacity-60" style={{ backgroundColor: BRAND_COLOR }}>{isSignupLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{isSignupLoading ? 'Creating Account...' : 'Create Account'}</button>
@@ -650,6 +765,7 @@ function AuthExperience({
           </div>
         </div>
       ) : null}
+      {activePolicyModal ? <PolicyModal type={activePolicyModal} onAgree={handleAgreeToPolicy} onDecline={handleDeclinePolicy} /> : null}
       {otpChallenge ? <OtpModal key={otpChallenge.requestId} challenge={otpChallenge} onVerifyOtp={onVerifyOtp} onResendOtp={onResendOtp} onCancelOtp={onCancelOtp} /> : null}
     </div>
   )

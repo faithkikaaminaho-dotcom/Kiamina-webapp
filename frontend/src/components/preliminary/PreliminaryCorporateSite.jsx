@@ -733,6 +733,14 @@ function SocialBadge({ href, name }) {
   )
 }
 
+function WhatsAppIcon({ className = 'h-4 w-4' }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M19.05 4.94A9.9 9.9 0 0 0 12 2a9.94 9.94 0 0 0-8.62 14.9L2 22l5.25-1.37A10 10 0 0 0 12 22a9.99 9.99 0 0 0 7.05-17.06ZM12 20.06a8.01 8.01 0 0 1-4.08-1.11l-.29-.17-3.12.81.83-3.04-.19-.31A8.06 8.06 0 1 1 12 20.06Zm4.42-5.99c-.24-.12-1.42-.7-1.64-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.94-.14.16-.28.18-.52.06-.24-.12-1-.37-1.9-1.18-.7-.62-1.17-1.38-1.31-1.61-.14-.24-.01-.37.11-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.3-.74-1.78-.2-.47-.4-.41-.54-.42h-.46c-.16 0-.42.06-.64.3-.22.24-.84.82-.84 2s.86 2.32.98 2.48c.12.16 1.69 2.59 4.1 3.63.57.25 1.02.39 1.37.5.58.18 1.11.15 1.53.09.47-.07 1.42-.58 1.62-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28Z" />
+    </svg>
+  )
+}
+
 function PreliminaryCorporateSite({
   activePage = 'home',
   onNavigatePage,
@@ -2039,8 +2047,9 @@ function PreliminaryCorporateSite({
               <button
                 type="button"
                 onClick={handleOpenWhatsAppContact}
-                className="rounded-full border border-[#D9E3F4] px-3 py-1.5 font-semibold text-[#073D7F] transition hover:bg-[#F1F1F1] hover:text-[#25D366]"
+                className="inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-2 font-semibold text-white shadow-[0_14px_30px_rgba(37,211,102,0.28)] transition hover:bg-[#1fba59]"
               >
+                <WhatsAppIcon className="h-4 w-4" />
                 WhatsApp Contact
               </button>
             </div>
