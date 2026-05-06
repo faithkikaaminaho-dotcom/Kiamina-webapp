@@ -2000,20 +2000,18 @@ function PreliminaryCorporateSite({
               </div>
               <div className="mt-2 text-xs text-slate-500">Stay connected for insights and updates</div>
                 <div className="mt-5 flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => handleNavigate('privacy')}
+                  <a
+                    href="/privacy"
                     className="inline-flex items-center rounded-full border border-[#D9E3F4] bg-white px-4 py-2 text-sm font-semibold text-[#073D7F] transition hover:border-[#6491DE] hover:text-[#6491DE]"
                   >
                     Privacy Statement
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleNavigate('legal')}
+                  </a>
+                  <a
+                    href="/legal"
                     className="inline-flex items-center rounded-full border border-[#D9E3F4] bg-white px-4 py-2 text-sm font-semibold text-[#073D7F] transition hover:border-[#6491DE] hover:text-[#6491DE]"
                   >
                     Legal Statement
-                  </button>
+                  </a>
               </div>
             </div>
           </div>
