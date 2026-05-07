@@ -17,6 +17,23 @@ const stripApiPrefix = (pathValue) => {
     : trimmedPath;
 };
 
+const isPublicAuthOrAvailabilityRoute = (normalizedMethod, normalizedPath) =>
+  (normalizedMethod === "GET" || normalizedMethod === "POST") &&
+  (
+    normalizedPath === "/auth/bootstrap-owner-status" ||
+    normalizedPath === "/auth/authenticate-password" ||
+    normalizedPath === "/auth/register-account" ||
+    normalizedPath === "/auth/login-session" ||
+    normalizedPath === "/auth/refresh-token" ||
+    normalizedPath === "/auth/send-otp" ||
+    normalizedPath === "/auth/send-email-verification-link" ||
+    normalizedPath === "/auth/send-password-reset-link" ||
+    normalizedPath === "/auth/verify-otp" ||
+    normalizedPath === "/auth/verify-token" ||
+    normalizedPath === "/auth/social-account-status" ||
+    normalizedPath === "/users/public/phone-availability"
+  );
+
 const getPublicRouteLimiterKey = (methodValue, pathValue) => {
   const normalizedMethod = methodValue.toUpperCase();
   const normalizedPath = stripApiPrefix(pathValue);
@@ -53,6 +70,10 @@ const getPublicRouteLimiterKey = (methodValue, pathValue) => {
     ) {
       return "support-public";
     }
+  }
+
+  if (isPublicAuthOrAvailabilityRoute(normalizedMethod, normalizedPath)) {
+    return "public-auth";
   }
 
   if (normalizedMethod === "POST" && normalizedPath === "/users/public/support-leads") {
@@ -95,6 +116,10 @@ const isRateLimitExemptPublicRoute = (methodValue, pathValue) => {
     (normalizedMethod === "GET" || normalizedMethod === "POST") &&
     normalizedPath.startsWith("/notifications/support/public/tickets")
   ) {
+    return true;
+  }
+
+  if (isPublicAuthOrAvailabilityRoute(normalizedMethod, normalizedPath)) {
     return true;
   }
 
